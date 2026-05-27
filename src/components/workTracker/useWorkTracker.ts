@@ -5,7 +5,6 @@ import {
   ActivityType,
   DayKey,
   ExceptionType,
-  HOLIDAY_DEFAULT_HOURS,
   MarkMode,
   SAVED_MONTHS_KEY,
   SETTINGS_KEY,
@@ -33,6 +32,10 @@ import {
 export function useWorkTracker() {
   const initialUiState = getInitialUiState();
   const today = new Date();
+
+  const DEFAULT_HOURLY_RATE = 15;
+  const DEFAULT_TAX_PERCENT = 0;
+  const DEFAULT_DEFAULT_HOURS = 8;
 
   const [monthKey, setMonthKey] = useState<string>(initialUiState.monthKey);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([
@@ -70,6 +73,90 @@ export function useWorkTracker() {
     setActivityLog((previous) => [entry, ...previous].slice(0, 200));
   };
 
+  const getSavedMonthKeys = () => {
+    const rawSavedMonths = safeStorageGetItem(SAVED_MONTHS_KEY);
+    if (!rawSavedMonths) {
+      return [] as string[];
+    }
+
+    try {
+      const parsed = JSON.parse(rawSavedMonths) as unknown;
+      if (!Array.isArray(parsed)) {
+        return [] as string[];
+      }
+      return parsed.filter(
+        (month): month is string =>
+          typeof month === "string" && /^\d{4}-\d{2}$/.test(month),
+      );
+    } catch {
+      return [] as string[];
+    }
+  };
+
+  const getCarryForwardGlobalValues = (targetMonth: string) => {
+    const priorMonths = getSavedMonthKeys()
+      .filter((mk) => mk <= targetMonth)
+      .sort()
+      .reverse();
+
+    for (const mk of priorMonths) {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (!raw) {
+        continue;
+      }
+
+      try {
+        const data = JSON.parse(raw) as Partial<TrackerData>;
+        if (
+          typeof data.hourlyRate === "number" &&
+          typeof data.taxPercent === "number"
+        ) {
+          return {
+            hourlyRate: Math.max(0, data.hourlyRate),
+            taxPercent: clampPercent(data.taxPercent),
+            defaultHours:
+              typeof data.defaultHours === "number"
+                ? Math.max(0, data.defaultHours)
+                : DEFAULT_DEFAULT_HOURS,
+          };
+        }
+      } catch {
+        // ignore corrupted month data and continue
+      }
+    }
+
+    return {
+      hourlyRate: DEFAULT_HOURLY_RATE,
+      taxPercent: DEFAULT_TAX_PERCENT,
+      defaultHours: DEFAULT_DEFAULT_HOURS,
+    };
+  };
+
+  const updateCurrentAndFutureMonthsGlobalValue = (
+    field: "hourlyRate" | "taxPercent" | "defaultHours",
+    value: number,
+  ) => {
+    const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
+
+    monthsToUpdate.forEach((mk) => {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (!raw) {
+        return;
+      }
+
+      try {
+        const data = JSON.parse(raw) as TrackerData;
+        const nextData: TrackerData = {
+          ...data,
+          [field]: value,
+        };
+        safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
+      } catch {
+        // ignore corrupted month data
+      }
+    });
+  };
+
   const handleMonthChange = (nextMonth: string) => {
     if (!nextMonth || nextMonth === monthKey) {
       return;
@@ -102,13 +189,16 @@ export function useWorkTracker() {
   };
 
   const onHourlyRateChange = (value: number) => {
-    setHourlyRate(value);
-    addActivity("value-change", `Updated hourly rate to ${value}`);
+    const clamped = Math.max(0, value || 0);
+    setHourlyRate(clamped);
+    updateCurrentAndFutureMonthsGlobalValue("hourlyRate", clamped);
+    addActivity("value-change", `Updated hourly rate to ${clamped}`);
   };
 
   const onTaxPercentChange = (value: number) => {
     const clamped = clampPercent(value);
     setTaxPercent(clamped);
+    updateCurrentAndFutureMonthsGlobalValue("taxPercent", clamped);
     addActivity("value-change", `Updated tax to ${clamped}%`);
   };
 
@@ -125,8 +215,10 @@ export function useWorkTracker() {
   };
 
   const onDefaultHoursChange = (value: number) => {
-    setDefaultHours(value);
-    addActivity("value-change", `Updated default hours/day to ${value}`);
+    const next = Math.max(0, value || 0);
+    setDefaultHours(next);
+    updateCurrentAndFutureMonthsGlobalValue("defaultHours", next);
+    addActivity("value-change", `Updated holiday hours/day to ${next}`);
   };
 
   useEffect(() => {
@@ -186,12 +278,13 @@ export function useWorkTracker() {
     const legacyData = saved ? null : null;
 
     if (!saved && !legacyData) {
+      const carryForward = getCarryForwardGlobalValues(monthKey);
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
       setHoursPerDay(8);
-      setHourlyRate(15);
-      setTaxPercent(0);
+      setHourlyRate(carryForward.hourlyRate);
+      setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
-      setDefaultHours(8);
+      setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
       setIsMonthHydrated(true);
@@ -210,17 +303,22 @@ export function useWorkTracker() {
       setHourlyRate(data.hourlyRate);
       setTaxPercent(data.taxPercent ?? 0);
       setExtraDeduction(data.extraDeduction ?? 0);
-      setDefaultHours(data.defaultHours);
+      setDefaultHours(
+        typeof data.defaultHours === "number"
+          ? data.defaultHours
+          : getCarryForwardGlobalValues(monthKey).defaultHours,
+      );
       setExceptions(data.exceptions ?? {});
       setDailyHours(data.dailyHours ?? {});
     } catch {
       safeStorageRemoveItem(`tracker-${monthKey}`);
+      const carryForward = getCarryForwardGlobalValues(monthKey);
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
       setHoursPerDay(8);
-      setHourlyRate(15);
-      setTaxPercent(0);
+      setHourlyRate(carryForward.hourlyRate);
+      setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
-      setDefaultHours(8);
+      setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
     } finally {
@@ -302,15 +400,15 @@ export function useWorkTracker() {
         }
         if (exceptions[key] === "vacation") {
           const manualHours = dailyHours[key] ?? 0;
-          return total + HOLIDAY_DEFAULT_HOURS + clampHours(manualHours);
+          return total + defaultHours + clampHours(manualHours);
         }
         const dayHours = dailyHours[key] ?? hoursPerDay;
         return total + clampHours(dayHours);
       }, 0),
-    [workingDates, exceptions, dailyHours, hoursPerDay],
+    [workingDates, exceptions, dailyHours, hoursPerDay, defaultHours],
   );
 
-  const estimatedHours = workingDates.length * defaultHours;
+  const estimatedHours = workingDates.length * hoursPerDay;
   const grossSalary = actualHours * hourlyRate;
   const taxAmount = grossSalary * (clampPercent(taxPercent) / 100);
   const extraDeductionAmount = Math.max(0, extraDeduction);
@@ -401,7 +499,8 @@ export function useWorkTracker() {
               if (data.exceptions[key] === "vacation") {
                 const manualHours = data.dailyHours[key] ?? 0;
                 totalActualHours +=
-                  HOLIDAY_DEFAULT_HOURS + clampHours(manualHours);
+                  (data.defaultHours ?? DEFAULT_DEFAULT_HOURS) +
+                  clampHours(manualHours);
               } else {
                 const hours = data.dailyHours[key] ?? data.hoursPerDay;
                 totalActualHours += clampHours(hours);

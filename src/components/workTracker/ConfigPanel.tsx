@@ -237,7 +237,7 @@ export default function ConfigPanel({
           </label>
 
           <label className="col-span-2 text-sm font-medium text-slate-600 dark:text-slate-300">
-            Default hours/day
+            Holiday hours/day
             <input
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               type="number"
