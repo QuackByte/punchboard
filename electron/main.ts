@@ -1,11 +1,24 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, nativeImage } from "electron";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function loadAppIcon(iconPath: string) {
+  const iconSvg = fs.readFileSync(iconPath, "utf8");
+  return nativeImage.createFromDataURL(
+    `data:image/svg+xml;base64,${Buffer.from(iconSvg).toString("base64")}`,
+  );
+}
+
 function createMainWindow() {
+  const iconPath = app.isPackaged
+    ? path.join(__dirname, "../dist/icon.svg")
+    : path.join(process.cwd(), "public/icon.svg");
+  const iconImage = loadAppIcon(iconPath);
+
   const window = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -13,6 +26,7 @@ function createMainWindow() {
     minHeight: 720,
     backgroundColor: "#e2e8f0",
     title: "Work Hours Tracker",
+    icon: iconImage,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -32,6 +46,14 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  const iconPath = app.isPackaged
+    ? path.join(__dirname, "../dist/icon.svg")
+    : path.join(process.cwd(), "public/icon.svg");
+
+  if (process.platform === "darwin") {
+    app.dock.setIcon(loadAppIcon(iconPath));
+  }
+
   createMainWindow();
 
   app.on("activate", () => {
