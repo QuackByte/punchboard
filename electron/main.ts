@@ -7,16 +7,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function loadAppIcon(iconPath: string) {
+  if (path.extname(iconPath).toLowerCase() !== ".svg") {
+    return nativeImage.createFromPath(iconPath);
+  }
+
   const iconSvg = fs.readFileSync(iconPath, "utf8");
   return nativeImage.createFromDataURL(
     `data:image/svg+xml;base64,${Buffer.from(iconSvg).toString("base64")}`,
   );
 }
 
+function getAppIconPath() {
+  return app.isPackaged
+    ? path.join(__dirname, "../public/work_hours_tracker_icon.svg")
+    : path.join(process.cwd(), "public/work_hours_tracker_icon.svg");
+}
+
 function createMainWindow() {
-  const iconPath = app.isPackaged
-    ? path.join(__dirname, "../dist/icon.svg")
-    : path.join(process.cwd(), "public/icon.svg");
+  const iconPath = getAppIconPath();
   const iconImage = loadAppIcon(iconPath);
 
   const window = new BrowserWindow({
@@ -46,12 +54,10 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
-  const iconPath = app.isPackaged
-    ? path.join(__dirname, "../dist/icon.svg")
-    : path.join(process.cwd(), "public/icon.svg");
+  const iconPath = getAppIconPath();
 
   if (process.platform === "darwin") {
-    app.dock.setIcon(loadAppIcon(iconPath));
+    app.dock?.setIcon(loadAppIcon(iconPath));
   }
 
   createMainWindow();

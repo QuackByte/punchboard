@@ -18,12 +18,14 @@
     "appId": "com.workhourstracker.desktop",
     "productName": "Work Hours Tracker",
     "files": [
+      "build/**/*",
       "dist/**/*",
       "dist-electron/**/*",
       "public/**/*",
       "package.json"
     ],
     "mac": {
+      "icon": "public/WorkHoursTracker.icns",
       "target": [
         "dmg"
       ]
