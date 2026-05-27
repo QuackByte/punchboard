@@ -30,6 +30,9 @@ interface ConfigPanelProps {
   recentActivity: ActivityLogEntry[];
   onExportData: () => void;
   onImportData: (file: File) => void;
+  isFileMode: boolean;
+  filePath: string;
+  onChangeFile: () => void;
 }
 
 export default function ConfigPanel({
@@ -58,6 +61,9 @@ export default function ConfigPanel({
   recentActivity,
   onExportData,
   onImportData,
+  isFileMode,
+  filePath,
+  onChangeFile,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,24 +90,50 @@ export default function ConfigPanel({
         Configure your month, global payslip start day, and weekday schedule.
       </p>
       <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-        Saved months: {savedMonthsCount} | Last save:{" "}
-        {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
+        {isFileMode ? (
+          <>
+            <span
+              className="block truncate"
+              title={filePath}
+            >
+              📁 {filePath || "No file chosen"}
+            </span>
+            <span>
+              Months saved: {savedMonthsCount} | Last save:{" "}
+              {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
+            </span>
+          </>
+        ) : (
+          <>
+            Saved months: {savedMonthsCount} | Last save:{" "}
+            {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
+          </>
+        )}
       </p>
 
       <div className="mt-3 flex gap-2">
+        {isFileMode && (
+          <button
+            type="button"
+            onClick={onChangeFile}
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+          >
+            Change file
+          </button>
+        )}
         <button
           type="button"
           onClick={onExportData}
           className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
         >
-          Export backup
+          {isFileMode ? "Save backup copy" : "Export backup"}
         </button>
         <button
           type="button"
           onClick={handleImportClick}
           className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
         >
-          Import backup
+          {isFileMode ? "Restore backup" : "Import backup"}
         </button>
         <input
           ref={fileInputRef}

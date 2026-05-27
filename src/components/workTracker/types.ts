@@ -53,6 +53,16 @@ export interface TrackerSettings {
   payslipStartDay: number;
 }
 
+export interface DataFile {
+  version: 1;
+  savedAt: string;
+  uiState: TrackerUiState;
+  settings: TrackerSettings;
+  savedMonths: string[];
+  activityLog: ActivityLogEntry[];
+  months: Record<string, TrackerData>;
+}
+
 export interface ActivityLogEntry {
   id: string;
   monthKey: string;

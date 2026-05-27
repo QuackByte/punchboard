@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ACTIVITY_LOG_KEY,
   ActivityLogEntry,
   ActivityType,
+  DataFile,
   DayKey,
   ExceptionType,
   MarkMode,
@@ -28,6 +29,8 @@ import {
   safeStorageRemoveItem,
   safeStorageSetItem,
 } from "./utils";
+
+const isFileMode = !!window.fileAPI?.isElectron;
 
 export function useWorkTracker() {
   const initialUiState = getInitialUiState();
@@ -62,6 +65,9 @@ export function useWorkTracker() {
   const [isMonthHydrated, setIsMonthHydrated] = useState<boolean>(false);
   const [graphYear, setGraphYear] = useState<number>(initialUiState.graphYear);
 
+  const [fileInitialized, setFileInitialized] = useState<boolean>(!isFileMode);
+  const [filePath, setFilePath] = useState<string>("");
+
   const addActivity = (type: ActivityType, message: string) => {
     const entry: ActivityLogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -72,6 +78,78 @@ export function useWorkTracker() {
     };
     setActivityLog((previous) => [entry, ...previous].slice(0, 200));
   };
+
+  const populateLocalStorageFromFile = (payload: DataFile) => {
+    if (payload.settings) {
+      safeStorageSetItem(SETTINGS_KEY, JSON.stringify(payload.settings));
+    }
+    if (payload.uiState) {
+      safeStorageSetItem(UI_STATE_KEY, JSON.stringify(payload.uiState));
+    }
+    if (Array.isArray(payload.savedMonths)) {
+      safeStorageSetItem(
+        SAVED_MONTHS_KEY,
+        JSON.stringify(payload.savedMonths),
+      );
+    }
+    if (Array.isArray(payload.activityLog)) {
+      safeStorageSetItem(
+        ACTIVITY_LOG_KEY,
+        JSON.stringify(payload.activityLog.slice(0, 200)),
+      );
+    }
+    if (payload.months && typeof payload.months === "object") {
+      Object.entries(payload.months).forEach(([mk, data]) => {
+        if (/^\d{4}-\d{2}$/.test(mk)) {
+          safeStorageSetItem(`tracker-${mk}`, JSON.stringify(data));
+        }
+      });
+    }
+  };
+
+  const buildFilePayload = useCallback(
+    (
+      currentMonthKey: string,
+      currentGraphYear: number,
+      currentPayslipStartDay: number,
+      currentSavedMonths: string[],
+      currentActivityLog: ActivityLogEntry[],
+      currentMonthData: TrackerData,
+    ): DataFile => {
+      const months: Record<string, TrackerData> = {};
+      const allMonths = currentSavedMonths.includes(currentMonthKey)
+        ? currentSavedMonths
+        : [...currentSavedMonths, currentMonthKey];
+
+      allMonths.forEach((mk) => {
+        if (mk === currentMonthKey) {
+          months[mk] = currentMonthData;
+          return;
+        }
+        const raw = safeStorageGetItem(`tracker-${mk}`);
+        if (raw) {
+          try {
+            months[mk] = JSON.parse(raw) as TrackerData;
+          } catch {
+            // skip corrupt entry
+          }
+        }
+      });
+
+      return {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        uiState: { monthKey: currentMonthKey, graphYear: currentGraphYear },
+        settings: { payslipStartDay: currentPayslipStartDay },
+        savedMonths: currentSavedMonths,
+        activityLog: currentActivityLog,
+        months,
+      };
+    },
+    [],
+  );
+
+  const fileWritePendingRef = useRef(false);
 
   const getSavedMonthKeys = () => {
     const rawSavedMonths = safeStorageGetItem(SAVED_MONTHS_KEY);
@@ -157,6 +235,100 @@ export function useWorkTracker() {
     });
   };
 
+  const initializeFromFile = useCallback(
+    (payload: DataFile, path: string) => {
+      populateLocalStorageFromFile(payload);
+
+      if (payload.settings) {
+        setPayslipStartDay(clampDay(payload.settings.payslipStartDay ?? 21));
+      }
+      if (payload.uiState) {
+        setMonthKey(payload.uiState.monthKey);
+        setGraphYear(payload.uiState.graphYear);
+      }
+      if (Array.isArray(payload.savedMonths)) {
+        setSavedMonths(payload.savedMonths);
+      }
+      if (Array.isArray(payload.activityLog)) {
+        setActivityLog(payload.activityLog.slice(0, 200));
+      }
+
+      setFilePath(path);
+      setFileInitialized(true);
+    },
+    [],
+  );
+
+  const tryLoadRememberedFile = useCallback(async () => {
+    if (!isFileMode) return;
+    const path = await window.fileAPI!.getRememberedPath();
+    if (!path) return;
+    const raw = await window.fileAPI!.readFile();
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as DataFile;
+      if (payload.version === 1) {
+        initializeFromFile(payload, path);
+      }
+    } catch {
+      // corrupted file — stay on picker screen
+    }
+  }, [initializeFromFile]);
+
+  useEffect(() => {
+    void tryLoadRememberedFile();
+  }, [tryLoadRememberedFile]);
+
+  const chooseExistingFile = useCallback(async () => {
+    const path = await window.fileAPI!.openDialog();
+    if (!path) return;
+    await window.fileAPI!.setRememberedPath(path);
+    const raw = await window.fileAPI!.readFile();
+    if (raw) {
+      try {
+        const payload = JSON.parse(raw) as DataFile;
+        if (payload.version === 1) {
+          initializeFromFile(payload, path);
+          return;
+        }
+      } catch {
+        // fall through to fresh init
+      }
+    }
+    const emptyPayload: DataFile = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      uiState: { monthKey, graphYear },
+      settings: { payslipStartDay },
+      savedMonths: [],
+      activityLog: [],
+      months: {},
+    };
+    initializeFromFile(emptyPayload, path);
+  }, [monthKey, graphYear, payslipStartDay, initializeFromFile]);
+
+  const createNewFile = useCallback(async () => {
+    const path = await window.fileAPI!.saveDialog();
+    if (!path) return;
+    await window.fileAPI!.setRememberedPath(path);
+    const emptyPayload: DataFile = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      uiState: { monthKey, graphYear },
+      settings: { payslipStartDay },
+      savedMonths: [],
+      activityLog: [],
+      months: {},
+    };
+    await window.fileAPI!.writeFile(JSON.stringify(emptyPayload, null, 2));
+    initializeFromFile(emptyPayload, path);
+  }, [monthKey, graphYear, payslipStartDay, initializeFromFile]);
+
+  const changeFile = useCallback(async () => {
+    setFileInitialized(false);
+    await chooseExistingFile();
+  }, [chooseExistingFile]);
+
   const handleMonthChange = (nextMonth: string) => {
     if (!nextMonth || nextMonth === monthKey) {
       return;
@@ -222,6 +394,8 @@ export function useWorkTracker() {
   };
 
   useEffect(() => {
+    if (isFileMode) return;
+
     const rawSettings = safeStorageGetItem(SETTINGS_KEY);
     if (rawSettings) {
       try {
@@ -365,6 +539,57 @@ export function useWorkTracker() {
     dailyHours,
     monthKey,
     isMonthHydrated,
+  ]);
+
+  useEffect(() => {
+    if (!isFileMode || !fileInitialized || !isMonthHydrated) return;
+    if (fileWritePendingRef.current) return;
+
+    fileWritePendingRef.current = true;
+
+    const currentMonthData: TrackerData = {
+      selectedDays,
+      hoursPerDay,
+      hourlyRate,
+      taxPercent,
+      extraDeduction,
+      defaultHours,
+      exceptions,
+      dailyHours,
+    };
+
+    const payload = buildFilePayload(
+      monthKey,
+      graphYear,
+      payslipStartDay,
+      savedMonths,
+      activityLog,
+      currentMonthData,
+    );
+
+    void window.fileAPI!.writeFile(JSON.stringify(payload, null, 2)).finally(
+      () => {
+        fileWritePendingRef.current = false;
+      },
+    );
+  }, [
+    isFileMode,
+    fileInitialized,
+    isMonthHydrated,
+    selectedDays,
+    hoursPerDay,
+    hourlyRate,
+    taxPercent,
+    extraDeduction,
+    defaultHours,
+    exceptions,
+    dailyHours,
+    monthKey,
+    graphYear,
+    payslipStartDay,
+    savedMonths,
+    activityLog,
+    buildFilePayload,
   ]);
 
   const workingDates = useMemo(() => {
@@ -562,31 +787,25 @@ export function useWorkTracker() {
   }, [monthKey]);
 
   const exportData = () => {
-    const months: Record<string, TrackerData> = {};
+    const currentMonthData: TrackerData = {
+      selectedDays,
+      hoursPerDay,
+      hourlyRate,
+      taxPercent,
+      extraDeduction,
+      defaultHours,
+      exceptions,
+      dailyHours,
+    };
 
-    const allMonths = savedMonths.includes(monthKey)
-      ? savedMonths
-      : [...savedMonths, monthKey];
-
-    allMonths.forEach((mk) => {
-      const raw = safeStorageGetItem(`tracker-${mk}`);
-      if (raw) {
-        try {
-          months[mk] = JSON.parse(raw) as TrackerData;
-        } catch {
-          // skip corrupt entry
-        }
-      }
-    });
-
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      uiState: { monthKey, graphYear },
+    const payload = buildFilePayload(
+      monthKey,
+      graphYear,
+      payslipStartDay,
       savedMonths,
       activityLog,
-      months,
-    };
+      currentMonthData,
+    );
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -604,48 +823,20 @@ export function useWorkTracker() {
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        const payload = JSON.parse(text) as {
-          version: number;
-          uiState?: unknown;
-          savedMonths?: unknown;
-          activityLog?: unknown;
-          months?: Record<string, unknown>;
-        };
+        const payload = JSON.parse(text) as DataFile;
 
         if (payload.version !== 1) {
           alert("Unsupported backup format version.");
           return;
         }
 
-        if (payload.months && typeof payload.months === "object") {
-          Object.entries(payload.months).forEach(([mk, data]) => {
-            if (/^\d{4}-\d{2}$/.test(mk)) {
-              safeStorageSetItem(`tracker-${mk}`, JSON.stringify(data));
-            }
-          });
-        }
+        populateLocalStorageFromFile(payload);
 
-        if (Array.isArray(payload.savedMonths)) {
-          safeStorageSetItem(
-            SAVED_MONTHS_KEY,
-            JSON.stringify(payload.savedMonths),
-          );
+        if (isFileMode) {
+          initializeFromFile(payload, filePath);
+        } else {
+          window.location.reload();
         }
-
-        if (Array.isArray(payload.activityLog)) {
-          safeStorageSetItem(
-            ACTIVITY_LOG_KEY,
-            JSON.stringify(
-              (payload.activityLog as ActivityLogEntry[]).slice(0, 200),
-            ),
-          );
-        }
-
-        if (payload.uiState && typeof payload.uiState === "object") {
-          safeStorageSetItem(UI_STATE_KEY, JSON.stringify(payload.uiState));
-        }
-
-        window.location.reload();
       } catch {
         alert("Failed to import: the file is not a valid backup.");
       }
@@ -697,5 +888,11 @@ export function useWorkTracker() {
     selectedMonthInfo,
     exportData,
     importData,
+    isFileMode,
+    fileInitialized,
+    filePath,
+    chooseExistingFile,
+    createNewFile,
+    changeFile,
   };
 }

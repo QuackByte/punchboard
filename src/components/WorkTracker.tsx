@@ -1,6 +1,7 @@
 import CalendarGrid from "./workTracker/CalendarGrid";
 import CalendarMarkModeBar from "./workTracker/CalendarMarkModeBar";
 import ConfigPanel from "./workTracker/ConfigPanel";
+import FilePickerScreen from "./workTracker/FilePickerScreen";
 import StatsBar from "./workTracker/StatsBar";
 import { useTheme } from "./workTracker/useTheme";
 import { useWorkTracker } from "./workTracker/useWorkTracker";
@@ -52,7 +53,22 @@ export default function WorkTracker() {
     selectedMonthInfo,
     exportData,
     importData,
+    isFileMode,
+    fileInitialized,
+    filePath,
+    chooseExistingFile,
+    createNewFile,
+    changeFile,
   } = useWorkTracker();
+
+  if (isFileMode && !fileInitialized) {
+    return (
+      <FilePickerScreen
+        onChooseExisting={chooseExistingFile}
+        onCreateNew={createNewFile}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-8 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
@@ -83,6 +99,9 @@ export default function WorkTracker() {
           recentActivity={recentActivity}
           onExportData={exportData}
           onImportData={importData}
+          isFileMode={isFileMode}
+          filePath={filePath}
+          onChangeFile={changeFile}
         />
 
         <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
