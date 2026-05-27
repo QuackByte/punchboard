@@ -1,0 +1,94 @@
+<svg width="1024" height="1024" viewBox="0 0 680 680" role="img" xmlns="http://www.w3.org/2000/svg">
+ <title>Work Hours Tracker app icon</title>
+ <desc>A circular clock merged with a bar chart and a dollar coin, representing time tracking and payslip calculation.</desc>
+
+ <defs>
+ <linearGradient id="faceGrad" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#1e2a3a"/>
+ <stop offset="100%" stop-color="#111827"/>
+ </linearGradient>
+ <linearGradient id="rimGrad" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#3b82f6"/>
+ <stop offset="100%" stop-color="#2563eb"/>
+ </linearGradient>
+ <linearGradient id="coinGrad" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#fcd34d"/>
+ <stop offset="100%" stop-color="#f59e0b"/>
+ </linearGradient>
+ <linearGradient id="barGrad1" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#34d399"/>
+ <stop offset="100%" stop-color="#10b981"/>
+ </linearGradient>
+ <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#60a5fa"/>
+ <stop offset="100%" stop-color="#3b82f6"/>
+ </linearGradient>
+ <linearGradient id="barGrad3" x1="0" y1="0" x2="0" y2="1">
+ <stop offset="0%" stop-color="#34d399"/>
+ <stop offset="100%" stop-color="#10b981"/>
+ </linearGradient>
+ <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+ <feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+ </filter>
+ <clipPath id="circleClip">
+ <circle cx="340" cy="340" r="290"/>
+ </clipPath>
+ </defs>
+
+ <!-- Outer glow ring -->
+ <circle cx="340" cy="340" r="298" fill="none" stroke="#3b82f6" stroke-width="6" opacity="0.25"/>
+
+ <!-- Main circle body -->
+ <circle cx="340" cy="340" r="290" fill="url(#faceGrad)" filter="url(#softShadow)"/>
+
+ <!-- Rim ring -->
+ <circle cx="340" cy="340" r="290" fill="none" stroke="url(#rimGrad)" stroke-width="14"/>
+
+ <!-- Clock tick marks -->
+ <g stroke="#4b5e78" stroke-width="4" stroke-linecap="round">
+ <line x1="340" y1="82" x2="340" y2="112"/>
+ <line x1="598" y1="340" x2="568" y2="340"/>
+ <line x1="340" y1="598" x2="340" y2="568"/>
+ <line x1="82" y1="340" x2="112" y2="340"/>
+ <line x1="420" y1="85" x2="411" y2="113" stroke-width="2.5"/>
+ <line x1="493" y1="139" x2="476" y2="163" stroke-width="2.5"/>
+ <line x1="541" y1="207" x2="519" y2="225" stroke-width="2.5"/>
+ <line x1="595" y1="260" x2="567" y2="268" stroke-width="2.5"/>
+ <line x1="595" y1="420" x2="567" y2="412" stroke-width="2.5"/>
+ <line x1="541" y1="473" x2="519" y2="455" stroke-width="2.5"/>
+ <line x1="493" y1="541" x2="476" y2="517" stroke-width="2.5"/>
+ <line x1="420" y1="595" x2="411" y2="567" stroke-width="2.5"/>
+ <line x1="260" y1="595" x2="269" y2="567" stroke-width="2.5"/>
+ <line x1="187" y1="541" x2="204" y2="517" stroke-width="2.5"/>
+ <line x1="139" y1="473" x2="161" y2="455" stroke-width="2.5"/>
+ <line x1="85" y1="420" x2="113" y2="412" stroke-width="2.5"/>
+ <line x1="85" y1="260" x2="113" y2="268" stroke-width="2.5"/>
+ <line x1="139" y1="207" x2="161" y2="225" stroke-width="2.5"/>
+ <line x1="187" y1="139" x2="204" y2="163" stroke-width="2.5"/>
+ <line x1="260" y1="85" x2="269" y2="113" stroke-width="2.5"/>
+ </g>
+
+ <!-- Bar chart clipped to circle -->
+ <g clip-path="url(#circleClip)">
+ <line x1="180" y1="490" x2="500" y2="490" stroke="#2d3f55" stroke-width="3"/>
+ <rect x="195" y="395" width="52" height="95" rx="8" fill="url(#barGrad1)" opacity="0.9"/>
+ <rect x="264" y="350" width="52" height="140" rx="8" fill="url(#barGrad2)" opacity="0.9"/>
+ <rect x="333" y="410" width="52" height="80" rx="8" fill="url(#barGrad3)" opacity="0.9"/>
+ <rect x="402" y="370" width="52" height="120" rx="8" fill="url(#barGrad2)" opacity="0.9"/>
+ </g>
+
+ <!-- Clock hands -->
+ <line x1="340" y1="340" x2="245" y2="225" stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>
+ <line x1="340" y1="340" x2="430" y2="185" stroke="#60a5fa" stroke-width="8" stroke-linecap="round"/>
+
+ <!-- Center cap -->
+ <circle cx="340" cy="340" r="14" fill="#3b82f6"/>
+ <circle cx="340" cy="340" r="6" fill="#e2e8f0"/>
+
+ <!-- Coin badge -->
+ <circle cx="512" cy="512" r="72" fill="url(#coinGrad)" filter="url(#softShadow)"/>
+ <circle cx="512" cy="512" r="72" fill="none" stroke="#fbbf24" stroke-width="5"/>
+ <circle cx="512" cy="512" r="58" fill="none" stroke="#fcd34d" stroke-width="2.5" opacity="0.5"/>
+ <text x="512" y="530" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#78350f">$</text>
+
+</svg>
