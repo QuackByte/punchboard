@@ -52,6 +52,8 @@ export default function WorkTracker() {
     yearlyData,
     calendarCells,
     selectedMonthInfo,
+    exportData,
+    importData,
   } = useWorkTracker();
 
   return (
@@ -83,6 +85,8 @@ export default function WorkTracker() {
           defaultHours={defaultHours}
           onDefaultHoursChange={onDefaultHoursChange}
           recentActivity={recentActivity}
+          onExportData={exportData}
+          onImportData={importData}
         />
 
         <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">

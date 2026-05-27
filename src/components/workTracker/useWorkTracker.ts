@@ -508,6 +508,98 @@ export function useWorkTracker() {
     };
   }, [monthKey]);
 
+  const exportData = () => {
+    const months: Record<string, TrackerData> = {};
+
+    const allMonths = savedMonths.includes(monthKey)
+      ? savedMonths
+      : [...savedMonths, monthKey];
+
+    allMonths.forEach((mk) => {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (raw) {
+        try {
+          months[mk] = JSON.parse(raw) as TrackerData;
+        } catch {
+          // skip corrupt entry
+        }
+      }
+    });
+
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      uiState: { monthKey, graphYear },
+      savedMonths,
+      activityLog,
+      months,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `work-hours-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const payload = JSON.parse(text) as {
+          version: number;
+          uiState?: unknown;
+          savedMonths?: unknown;
+          activityLog?: unknown;
+          months?: Record<string, unknown>;
+        };
+
+        if (payload.version !== 1) {
+          alert("Unsupported backup format version.");
+          return;
+        }
+
+        if (payload.months && typeof payload.months === "object") {
+          Object.entries(payload.months).forEach(([mk, data]) => {
+            if (/^\d{4}-\d{2}$/.test(mk)) {
+              safeStorageSetItem(`tracker-${mk}`, JSON.stringify(data));
+            }
+          });
+        }
+
+        if (Array.isArray(payload.savedMonths)) {
+          safeStorageSetItem(
+            SAVED_MONTHS_KEY,
+            JSON.stringify(payload.savedMonths),
+          );
+        }
+
+        if (Array.isArray(payload.activityLog)) {
+          safeStorageSetItem(
+            ACTIVITY_LOG_KEY,
+            JSON.stringify(
+              (payload.activityLog as ActivityLogEntry[]).slice(0, 200),
+            ),
+          );
+        }
+
+        if (payload.uiState && typeof payload.uiState === "object") {
+          safeStorageSetItem(UI_STATE_KEY, JSON.stringify(payload.uiState));
+        }
+
+        window.location.reload();
+      } catch {
+        alert("Failed to import: the file is not a valid backup.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return {
     today,
     monthKey,
@@ -552,5 +644,7 @@ export function useWorkTracker() {
     yearlyData,
     calendarCells,
     selectedMonthInfo,
+    exportData,
+    importData,
   };
 }

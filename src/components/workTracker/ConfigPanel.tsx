@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ActivityLogEntry, DayKey, daysOfWeek } from "./types";
 import ThemeToggle from "./ThemeToggle";
 import { Theme } from "./useTheme";
@@ -29,6 +30,8 @@ interface ConfigPanelProps {
   defaultHours: number;
   onDefaultHoursChange: (value: number) => void;
   recentActivity: ActivityLogEntry[];
+  onExportData: () => void;
+  onImportData: (file: File) => void;
 }
 
 export default function ConfigPanel({
@@ -57,7 +60,22 @@ export default function ConfigPanel({
   defaultHours,
   onDefaultHoursChange,
   recentActivity,
+  onExportData,
+  onImportData,
 }: ConfigPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onImportData(file);
+      event.target.value = "";
+    }
+  };
   return (
     <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div className="flex items-start justify-between gap-3">
@@ -73,6 +91,30 @@ export default function ConfigPanel({
         Saved months: {savedMonthsCount} | Last save:{" "}
         {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
       </p>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={onExportData}
+          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+        >
+          Export backup
+        </button>
+        <button
+          type="button"
+          onClick={handleImportClick}
+          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+        >
+          Import backup
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
 
       <div className="mt-6 space-y-4">
         <div>
