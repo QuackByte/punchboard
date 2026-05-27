@@ -17,7 +17,6 @@ export default function WorkTracker() {
     taxPercent,
     extraDeduction,
     payslipStartDay,
-    payslipEndDay,
     defaultHours,
     exceptionMode,
     setExceptionMode,
@@ -35,7 +34,6 @@ export default function WorkTracker() {
     onTaxPercentChange,
     onExtraDeductionChange,
     onPayslipStartDayChange,
-    onPayslipEndDayChange,
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,
@@ -80,8 +78,6 @@ export default function WorkTracker() {
           onExtraDeductionChange={onExtraDeductionChange}
           payslipStartDay={payslipStartDay}
           onPayslipStartDayChange={onPayslipStartDayChange}
-          payslipEndDay={payslipEndDay}
-          onPayslipEndDayChange={onPayslipEndDayChange}
           defaultHours={defaultHours}
           onDefaultHoursChange={onDefaultHoursChange}
           recentActivity={recentActivity}

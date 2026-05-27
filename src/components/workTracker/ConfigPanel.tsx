@@ -25,8 +25,6 @@ interface ConfigPanelProps {
   onExtraDeductionChange: (value: number) => void;
   payslipStartDay: number;
   onPayslipStartDayChange: (value: number) => void;
-  payslipEndDay: number;
-  onPayslipEndDayChange: (value: number) => void;
   defaultHours: number;
   onDefaultHoursChange: (value: number) => void;
   recentActivity: ActivityLogEntry[];
@@ -55,8 +53,6 @@ export default function ConfigPanel({
   onExtraDeductionChange,
   payslipStartDay,
   onPayslipStartDayChange,
-  payslipEndDay,
-  onPayslipEndDayChange,
   defaultHours,
   onDefaultHoursChange,
   recentActivity,
@@ -85,7 +81,7 @@ export default function ConfigPanel({
         <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
       </div>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Configure your month, payslip range, and weekday schedule.
+        Configure your month, global payslip start day, and weekday schedule.
       </p>
       <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
         Saved months: {savedMonthsCount} | Last save:{" "}
@@ -119,7 +115,7 @@ export default function ConfigPanel({
       <div className="mt-6 space-y-4">
         <div>
           <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Month
+            Payslip month (finishing month)
           </p>
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -236,20 +232,6 @@ export default function ConfigPanel({
               value={payslipStartDay}
               onChange={(event) =>
                 onPayslipStartDayChange(clampDay(Number(event.target.value)))
-              }
-            />
-          </label>
-
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Payslip end day
-            <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              type="number"
-              min={1}
-              max={31}
-              value={payslipEndDay}
-              onChange={(event) =>
-                onPayslipEndDayChange(clampDay(Number(event.target.value)))
               }
             />
           </label>

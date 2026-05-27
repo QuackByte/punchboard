@@ -41,8 +41,8 @@ export default function CalendarGrid({
       </div>
 
       <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-        Main month: {selectedMonthInfo.label}. Days from other months are tagged
-        with their month abbreviation.
+        Payslip month: {selectedMonthInfo.label}. Days from other months are
+        tagged with their month abbreviation.
       </p>
 
       <div className="mt-2 grid grid-cols-7 gap-2">

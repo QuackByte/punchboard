@@ -8,7 +8,9 @@ import {
   HOLIDAY_DEFAULT_HOURS,
   MarkMode,
   SAVED_MONTHS_KEY,
+  SETTINGS_KEY,
   TrackerData,
+  TrackerSettings,
   TrackerUiState,
   UI_STATE_KEY,
   weekdayMap,
@@ -22,7 +24,6 @@ import {
   formatMonthKey,
   getDatesInPayslipRange,
   getInitialUiState,
-  getPreviousMonthKey,
   parseMonthKey,
   safeStorageGetItem,
   safeStorageRemoveItem,
@@ -32,37 +33,6 @@ import {
 export function useWorkTracker() {
   const initialUiState = getInitialUiState();
   const today = new Date();
-
-  const getLegacyDataForMonth = (targetMonthKey: string) => {
-    const legacyMonthKey = getPreviousMonthKey(targetMonthKey);
-    const rawLegacyData = safeStorageGetItem(`tracker-${legacyMonthKey}`);
-
-    if (!rawLegacyData) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(rawLegacyData) as TrackerData;
-      const resolvedMonthKey =
-        parsed.payslipEndDay < parsed.payslipStartDay
-          ? formatMonthKey(
-              new Date(
-                parseMonthKey(legacyMonthKey).year,
-                parseMonthKey(legacyMonthKey).monthIndex + 1,
-                1,
-              ),
-            )
-          : legacyMonthKey;
-
-      if (resolvedMonthKey !== targetMonthKey) {
-        return null;
-      }
-
-      return parsed;
-    } catch {
-      return null;
-    }
-  };
 
   const [monthKey, setMonthKey] = useState<string>(initialUiState.monthKey);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([
@@ -77,7 +47,6 @@ export function useWorkTracker() {
   const [taxPercent, setTaxPercent] = useState<number>(0);
   const [extraDeduction, setExtraDeduction] = useState<number>(0);
   const [payslipStartDay, setPayslipStartDay] = useState<number>(21);
-  const [payslipEndDay, setPayslipEndDay] = useState<number>(20);
   const [defaultHours, setDefaultHours] = useState<number>(8);
   const [exceptionMode, setExceptionMode] = useState<MarkMode>("none");
   const [exceptions, setExceptions] = useState<Record<string, ExceptionType>>(
@@ -155,18 +124,22 @@ export function useWorkTracker() {
     addActivity("value-change", `Updated payslip start day to ${clamped}`);
   };
 
-  const onPayslipEndDayChange = (value: number) => {
-    const clamped = clampDay(value);
-    setPayslipEndDay(clamped);
-    addActivity("value-change", `Updated payslip end day to ${clamped}`);
-  };
-
   const onDefaultHoursChange = (value: number) => {
     setDefaultHours(value);
     addActivity("value-change", `Updated default hours/day to ${value}`);
   };
 
   useEffect(() => {
+    const rawSettings = safeStorageGetItem(SETTINGS_KEY);
+    if (rawSettings) {
+      try {
+        const parsed = JSON.parse(rawSettings) as Partial<TrackerSettings>;
+        setPayslipStartDay(clampDay(parsed.payslipStartDay ?? 21));
+      } catch {
+        safeStorageRemoveItem(SETTINGS_KEY);
+      }
+    }
+
     const rawLog = safeStorageGetItem(ACTIVITY_LOG_KEY);
     if (rawLog) {
       try {
@@ -189,6 +162,13 @@ export function useWorkTracker() {
   }, []);
 
   useEffect(() => {
+    safeStorageSetItem(
+      SETTINGS_KEY,
+      JSON.stringify({ payslipStartDay } satisfies TrackerSettings),
+    );
+  }, [payslipStartDay]);
+
+  useEffect(() => {
     safeStorageSetItem(ACTIVITY_LOG_KEY, JSON.stringify(activityLog));
   }, [activityLog]);
 
@@ -203,7 +183,7 @@ export function useWorkTracker() {
     setIsMonthHydrated(false);
 
     const saved = safeStorageGetItem(`tracker-${monthKey}`);
-    const legacyData = saved ? null : getLegacyDataForMonth(monthKey);
+    const legacyData = saved ? null : null;
 
     if (!saved && !legacyData) {
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
@@ -211,8 +191,6 @@ export function useWorkTracker() {
       setHourlyRate(15);
       setTaxPercent(0);
       setExtraDeduction(0);
-      setPayslipStartDay(21);
-      setPayslipEndDay(20);
       setDefaultHours(8);
       setExceptions({});
       setDailyHours({});
@@ -232,8 +210,6 @@ export function useWorkTracker() {
       setHourlyRate(data.hourlyRate);
       setTaxPercent(data.taxPercent ?? 0);
       setExtraDeduction(data.extraDeduction ?? 0);
-      setPayslipStartDay(data.payslipStartDay);
-      setPayslipEndDay(data.payslipEndDay);
       setDefaultHours(data.defaultHours);
       setExceptions(data.exceptions ?? {});
       setDailyHours(data.dailyHours ?? {});
@@ -244,8 +220,6 @@ export function useWorkTracker() {
       setHourlyRate(15);
       setTaxPercent(0);
       setExtraDeduction(0);
-      setPayslipStartDay(21);
-      setPayslipEndDay(20);
       setDefaultHours(8);
       setExceptions({});
       setDailyHours({});
@@ -265,8 +239,6 @@ export function useWorkTracker() {
       hourlyRate,
       taxPercent,
       extraDeduction,
-      payslipStartDay,
-      payslipEndDay,
       defaultHours,
       exceptions,
       dailyHours,
@@ -290,8 +262,6 @@ export function useWorkTracker() {
     hourlyRate,
     taxPercent,
     extraDeduction,
-    payslipStartDay,
-    payslipEndDay,
     defaultHours,
     exceptions,
     dailyHours,
@@ -300,15 +270,11 @@ export function useWorkTracker() {
   ]);
 
   const workingDates = useMemo(() => {
-    const rangeDates = getDatesInPayslipRange(
-      monthKey,
-      payslipStartDay,
-      payslipEndDay,
-    );
+    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
     return rangeDates.filter((date) =>
       selectedDays.includes(weekdayMap[date.getDay()]),
     );
-  }, [monthKey, payslipStartDay, payslipEndDay, selectedDays]);
+  }, [monthKey, payslipStartDay, selectedDays]);
 
   const exceptionSummary = useMemo(() => {
     let vacationDays = 0;
@@ -360,16 +326,12 @@ export function useWorkTracker() {
 
   const payslipDateLookup = useMemo(() => {
     const lookup = new Set<string>();
-    const rangeDates = getDatesInPayslipRange(
-      monthKey,
-      payslipStartDay,
-      payslipEndDay,
-    );
+    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
     rangeDates.forEach((date) => {
       lookup.add(dateKey(date));
     });
     return lookup;
-  }, [monthKey, payslipStartDay, payslipEndDay]);
+  }, [monthKey, payslipStartDay]);
 
   const applyException = (key: string) => {
     if (!workingDateLookup.has(key)) {
@@ -421,16 +383,12 @@ export function useWorkTracker() {
       }
 
       const dataStr = safeStorageGetItem(`tracker-${mKey}`);
-      const legacyData = dataStr ? null : getLegacyDataForMonth(mKey);
+      const legacyData = null;
 
       if (dataStr || legacyData) {
         try {
           const data: TrackerData = dataStr ? JSON.parse(dataStr) : legacyData;
-          const rangeDates = getDatesInPayslipRange(
-            mKey,
-            data.payslipStartDay,
-            data.payslipEndDay,
-          );
+          const rangeDates = getDatesInPayslipRange(mKey, payslipStartDay);
 
           let totalActualHours = 0;
           rangeDates.forEach((date) => {
@@ -465,14 +423,10 @@ export function useWorkTracker() {
     }
 
     return monthsData;
-  }, [graphYear, monthKey, actualHours]);
+  }, [graphYear, monthKey, actualHours, payslipStartDay]);
 
   const calendarCells = useMemo(() => {
-    const rangeDates = getDatesInPayslipRange(
-      monthKey,
-      payslipStartDay,
-      payslipEndDay,
-    );
+    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
     const cells: Array<Date | null> = [];
 
     if (rangeDates.length === 0) {
@@ -494,7 +448,7 @@ export function useWorkTracker() {
     }
 
     return cells;
-  }, [monthKey, payslipStartDay, payslipEndDay]);
+  }, [monthKey, payslipStartDay]);
 
   const selectedMonthInfo = useMemo(() => {
     const { year, monthIndex } = parseMonthKey(monthKey);
@@ -609,7 +563,6 @@ export function useWorkTracker() {
     taxPercent,
     extraDeduction,
     payslipStartDay,
-    payslipEndDay,
     defaultHours,
     exceptionMode,
     setExceptionMode,
@@ -627,7 +580,6 @@ export function useWorkTracker() {
     onTaxPercentChange,
     onExtraDeductionChange,
     onPayslipStartDayChange,
-    onPayslipEndDayChange,
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,

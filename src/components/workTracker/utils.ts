@@ -50,7 +50,7 @@ export function parseMonthKey(monthKey: string) {
 export function getInitialUiState() {
   const now = new Date();
   const fallback: TrackerUiState = {
-    monthKey: formatMonthKey(now),
+    monthKey: getCurrentPayslipEndMonthKey(now, 21),
     graphYear: now.getFullYear(),
   };
 
@@ -78,18 +78,35 @@ export function getInitialUiState() {
   }
 }
 
-export function getPayslipRange(
-  monthKey: string,
-  startDay: number,
-  endDay: number,
-) {
+function getCurrentPayslipEndMonthKey(today: Date, startDay: number) {
+  const safeStartDay = clampDay(startDay);
+  const endMonthDate =
+    today.getDate() >= safeStartDay
+      ? new Date(today.getFullYear(), today.getMonth() + 1, 1)
+      : new Date(today.getFullYear(), today.getMonth(), 1);
+
+  return formatMonthKey(endMonthDate);
+}
+
+export function getPayslipRange(monthKey: string, startDay: number) {
   const { year, monthIndex } = parseMonthKey(monthKey);
+  const safeStartDay = clampDay(startDay);
+  const startMonthDate = new Date(year, monthIndex - 1, 1);
+  const startMonthDays = new Date(
+    startMonthDate.getFullYear(),
+    startMonthDate.getMonth() + 1,
+    0,
+  ).getDate();
+  const resolvedStartDay = Math.min(safeStartDay, startMonthDays);
   const start = new Date(
-    year,
-    endDay < startDay ? monthIndex - 1 : monthIndex,
-    startDay,
+    startMonthDate.getFullYear(),
+    startMonthDate.getMonth(),
+    resolvedStartDay,
   );
-  const end = new Date(year, monthIndex, endDay);
+
+  const endMonthDays = new Date(year, monthIndex + 1, 0).getDate();
+  const endMonthStartDay = Math.min(safeStartDay, endMonthDays);
+  const end = new Date(year, monthIndex, endMonthStartDay - 1);
 
   return { start, end };
 }
@@ -99,12 +116,8 @@ export function getPreviousMonthKey(monthKey: string) {
   return formatMonthKey(new Date(year, monthIndex - 1, 1));
 }
 
-export function getDatesInPayslipRange(
-  monthKey: string,
-  startDay: number,
-  endDay: number,
-) {
-  const { start, end } = getPayslipRange(monthKey, startDay, endDay);
+export function getDatesInPayslipRange(monthKey: string, startDay: number) {
+  const { start, end } = getPayslipRange(monthKey, startDay);
   const dates: Date[] = [];
   const current = new Date(start);
 

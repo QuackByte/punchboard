@@ -44,11 +44,13 @@ export interface TrackerData {
   hourlyRate: number;
   taxPercent: number;
   extraDeduction: number;
-  payslipStartDay: number;
-  payslipEndDay: number;
   defaultHours: number;
   exceptions: Record<string, ExceptionType>;
   dailyHours: Record<string, number>;
+}
+
+export interface TrackerSettings {
+  payslipStartDay: number;
 }
 
 export interface ActivityLogEntry {
@@ -73,4 +75,5 @@ export interface YearlyDataPoint {
 export const ACTIVITY_LOG_KEY = "tracker-activity-log-v1";
 export const SAVED_MONTHS_KEY = "tracker-saved-months-v1";
 export const UI_STATE_KEY = "tracker-ui-state-v1";
+export const SETTINGS_KEY = "tracker-settings-v1";
 export const HOLIDAY_DEFAULT_HOURS = 9;
