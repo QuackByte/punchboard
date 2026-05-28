@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.2...work-hours-tracker-v1.1.3) (2026-05-28)
+
+
+### Bug Fixes
+
+* add missing description to package.json ([372144c](https://github.com/jsanzdev/work-hours-tracker/commit/372144c38413b273b3969f598a0d3b79a631e58c))
+* add missing description to package.json ([a81f242](https://github.com/jsanzdev/work-hours-tracker/commit/a81f24235449adfde22e1faf2a5cbba7e16bc6ec))
+
 ## [1.1.2](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.1...work-hours-tracker-v1.1.2) (2026-05-28)
 
 
