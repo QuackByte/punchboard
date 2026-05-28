@@ -1,8 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { autoUpdater } from "electron-updater";
+
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
