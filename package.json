@@ -1,5 +1,6 @@
 {
   "name": "work-hours-tracker",
+  "description": "Desktop app to track daily work hours",
   "private": true,
   "version": "1.1.2",
   "main": "dist-electron/main.js",
