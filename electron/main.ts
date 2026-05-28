@@ -3,9 +3,9 @@ import path from "node:path";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import type { AppUpdater } from "electron-updater";
 
 const require = createRequire(import.meta.url);
-const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +17,16 @@ type AutoUpdaterEvents = {
   on(event: "error", listener: (error: Error, message?: string) => void): void;
   on(event: "update-downloaded", listener: () => void): void;
 };
+
+function loadAutoUpdater(): AppUpdater | null {
+  try {
+    return (require("electron-updater") as typeof import("electron-updater"))
+      .autoUpdater;
+  } catch (error) {
+    console.error("Auto-update module failed to load", error);
+    return null;
+  }
+}
 
 function readAppConfig(): { dataFilePath?: string } {
   try {
@@ -138,6 +148,9 @@ function createMainWindow() {
 
 function setupAutoUpdates() {
   if (!app.isPackaged) return;
+
+  const autoUpdater = loadAutoUpdater();
+  if (!autoUpdater) return;
 
   const updaterEvents = autoUpdater as typeof autoUpdater & AutoUpdaterEvents;
 

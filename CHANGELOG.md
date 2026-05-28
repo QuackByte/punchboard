@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.3...work-hours-tracker-v1.1.4) (2026-05-28)
+
+
+### Bug Fixes
+
+* include macOS updater metadata and blockmaps in release uploads
+* prevent updater module load failures from crashing the packaged app
+
 ## [1.1.3](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.2...work-hours-tracker-v1.1.3) (2026-05-28)
 
 
