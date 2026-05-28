@@ -36,16 +36,13 @@ jobs:
         platform:
           - name: macOS
             os: macos-latest
-            build_args: --mac dmg -c.mac.identity=null
-            artifact_pattern: "*.dmg"
+            build_args: --mac dmg zip -c.mac.identity=null
           - name: Windows
             os: windows-latest
             build_args: --win nsis
-            artifact_pattern: "*.exe"
           - name: Linux
             os: ubuntu-latest
             build_args: --linux AppImage
-            artifact_pattern: "*.AppImage"
 
     steps:
       - uses: actions/checkout@v4
@@ -68,10 +65,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          mapfile -t files < <(find dist -maxdepth 1 -type f -name "${{ matrix.platform.artifact_pattern }}" | sort)
+          mapfile -t files < <(find dist -maxdepth 1 -type f | sort)
 
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "No assets found matching ${{ matrix.platform.artifact_pattern }} in dist/"
+            echo "No release assets found in dist/"
             exit 1
           fi
 

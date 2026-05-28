@@ -17,6 +17,13 @@
   "build": {
     "appId": "com.workhourstracker.desktop",
     "productName": "Work Hours Tracker",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jsanzdev",
+        "repo": "work-hours-tracker"
+      }
+    ],
     "files": [
       "build/**/*",
       "dist/**/*",
@@ -27,7 +34,8 @@
     "mac": {
       "icon": "public/WorkHoursTracker.icns",
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ]
     },
     "win": {
@@ -43,6 +51,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },

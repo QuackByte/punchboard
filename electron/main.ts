@@ -2,11 +2,13 @@ import { app, BrowserWindow, dialog, ipcMain, nativeImage } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { autoUpdater } from "electron-updater";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const APP_CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 function readAppConfig(): { dataFilePath?: string } {
   try {
@@ -126,6 +128,40 @@ function createMainWindow() {
   window.loadFile(path.join(__dirname, "../dist/index.html"));
 }
 
+function setupAutoUpdates() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("error", (error) => {
+    console.error("Auto-update failed", error);
+  });
+
+  autoUpdater.on("update-downloaded", async () => {
+    const result = await dialog.showMessageBox({
+      type: "info",
+      title: "Update ready",
+      message: "A new version has been downloaded.",
+      detail:
+        "Restart now to apply it, or continue working and it will install after you close the app.",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  void autoUpdater.checkForUpdatesAndNotify();
+  const timer = setInterval(() => {
+    void autoUpdater.checkForUpdatesAndNotify();
+  }, UPDATE_CHECK_INTERVAL_MS);
+  timer.unref();
+}
+
 app.whenReady().then(() => {
   registerFileIpcHandlers();
 
@@ -135,6 +171,7 @@ app.whenReady().then(() => {
     app.dock?.setIcon(loadAppIcon(iconPath));
   }
 
+  setupAutoUpdates();
   createMainWindow();
 
   app.on("activate", () => {
