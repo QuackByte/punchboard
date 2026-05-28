@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.0...work-hours-tracker-v1.1.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* update release workflow for proper PR-based releases ([9f66f4e](https://github.com/jsanzdev/work-hours-tracker/commit/9f66f4e902fa5010e0a042ef9922959747a9d2ac))
+* update release workflow for proper PR-based releases ([0d9cb04](https://github.com/jsanzdev/work-hours-tracker/commit/0d9cb04d57cbbdfc156cc5b9540ab58f53d5d603))
+* upgrade actions to Node.js 24 compatible versions ([0a30e59](https://github.com/jsanzdev/work-hours-tracker/commit/0a30e59c64883c971684c096d73c0a6afe773012))
+* upgrade actions to Node.js 24 compatible versions ([eade453](https://github.com/jsanzdev/work-hours-tracker/commit/eade4539837c041c82e6f38f25c3ea85f5a4f53f))
+
 ## [1.1.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.0.0...work-hours-tracker-v1.1.0) (2026-05-28)
 
 
