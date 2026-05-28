@@ -29,6 +29,17 @@
       "target": [
         "dmg"
       ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
     }
   },
   "dependencies": {
