@@ -13,6 +13,8 @@ jobs:
   release:
     name: Create release + changelog
     runs-on: ubuntu-latest
+    env:
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || github.token }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -24,12 +26,13 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@v5
         with:
+          token: ${{ env.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
       - name: Enable auto-merge for release PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ env.RELEASE_PLEASE_TOKEN }}
           PR_JSON: ${{ steps.release.outputs.pr }}
           PRS_JSON: ${{ steps.release.outputs.prs }}
         shell: bash
