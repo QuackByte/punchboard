@@ -27,6 +27,25 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Enable auto-merge for release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
+          PRS_JSON: ${{ steps.release.outputs.prs }}
+        shell: bash
+        run: |
+          pr_number="$(jq -r 'if type == "array" then .[0].number else .number end // empty' <<<"$PRS_JSON")"
+          if [ -z "$pr_number" ]; then
+            pr_number="$(jq -r '.number // empty' <<<"$PR_JSON")"
+          fi
+          if [ -z "$pr_number" ]; then
+            echo "Unable to determine release PR number"
+            exit 1
+          fi
+
+          gh pr merge "$pr_number" --auto --squash --delete-branch
+
   build-and-upload:
     name: Build ${{ matrix.platform.name }}
     needs: release
@@ -68,7 +87,10 @@ jobs:
         shell: bash
         run: |
           # Upload only app installers, not icons or build artifacts
-          mapfile -d '' -t files < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" \) -print0 | sort -z)
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" \) -print0 | sort -z)
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release assets found in dist/"
