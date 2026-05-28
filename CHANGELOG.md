@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.1...work-hours-tracker-v1.1.2) (2026-05-28)
+
+
+### Bug Fixes
+
+* quote release upload assets ([dc42252](https://github.com/jsanzdev/work-hours-tracker/commit/dc422527eea07710ad9a135205525beb7dbdf03a))
+
 ## [1.1.1](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.0...work-hours-tracker-v1.1.1) (2026-05-28)
 
 
