@@ -68,11 +68,11 @@ jobs:
         shell: bash
         run: |
           # Upload only app installers, not icons or build artifacts
-          files=$(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" \) | sort)
+          mapfile -d '' -t files < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" \) -print0 | sort -z)
 
-          if [ -z "$files" ]; then
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "No release assets found in dist/"
             exit 1
           fi
 
-          gh release upload "${{ needs.release.outputs.tag_name }}" $files --clobber
+          gh release upload "${{ needs.release.outputs.tag_name }}" "${files[@]}" --clobber
