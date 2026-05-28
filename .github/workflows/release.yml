@@ -65,11 +65,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          mapfile -t files < <(find dist -maxdepth 1 -type f | sort)
+          files=$(find dist -maxdepth 1 -type f | sort)
 
-          if [ "${#files[@]}" -eq 0 ]; then
+          if [ -z "$files" ]; then
             echo "No release assets found in dist/"
             exit 1
           fi
 
-          gh release upload "${{ needs.release.outputs.tag_name }}" "${files[@]}" --clobber
+          gh release upload "${{ needs.release.outputs.tag_name }}" $files --clobber
