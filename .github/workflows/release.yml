@@ -30,24 +30,6 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - name: Enable auto-merge for release PR
-        env:
-          GH_TOKEN: ${{ env.RELEASE_PLEASE_TOKEN }}
-          PR_JSON: ${{ steps.release.outputs.pr }}
-          PRS_JSON: ${{ steps.release.outputs.prs }}
-        shell: bash
-        run: |
-          pr_number="$(jq -r 'if type == "array" then .[0].number else .number end // empty' <<<"$PRS_JSON")"
-          if [ -z "$pr_number" ]; then
-            pr_number="$(jq -r '.number // empty' <<<"$PR_JSON")"
-          fi
-          if [ -z "$pr_number" ]; then
-            echo "No release PR created/updated in this run; skipping auto-merge."
-            exit 0
-          fi
-
-          gh pr merge "$pr_number" --auto --squash --delete-branch
-
   build-and-upload:
     name: Build ${{ matrix.platform.name }}
     needs: release
