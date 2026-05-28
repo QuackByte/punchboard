@@ -36,7 +36,7 @@ jobs:
         platform:
           - name: macOS
             os: macos-latest
-            build_args: --mac dmg
+            build_args: --mac dmg -c.mac.identity=null
             artifact_pattern: "*.dmg"
           - name: Windows
             os: windows-latest
