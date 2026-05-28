@@ -1,0 +1,20 @@
+# Changelog
+
+## [1.1.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.0.0...work-hours-tracker-v1.1.0) (2026-05-28)
+
+
+### Features
+
+* add data export and import functionality to WorkTracker and ConfigPanel ([3f2fdf9](https://github.com/jsanzdev/work-hours-tracker/commit/3f2fdf9ea381be3c8ec1f1b0744dd5f18c9f82cc))
+* add work tracker components and functionality ([6d925bb](https://github.com/jsanzdev/work-hours-tracker/commit/6d925bbdbbfcf502a26713b433cd7066a5513bb0))
+* configure Electron build and update project structure ([d9faeda](https://github.com/jsanzdev/work-hours-tracker/commit/d9faedab4ae00eb614894e49d496beec84a89384))
+* remove payslip end day functionality and update related components ([3336eb1](https://github.com/jsanzdev/work-hours-tracker/commit/3336eb1c1e130ad495544e69b800704163ef45ea))
+* rename default hours to holiday hours and update related logic ([6fb1d62](https://github.com/jsanzdev/work-hours-tracker/commit/6fb1d62faefffe82be70a45e49c6d1ab598a1478))
+* replace localStorage-only persistence with file-based storage in Electron ([290b72c](https://github.com/jsanzdev/work-hours-tracker/commit/290b72c0915a3ac3a74eccbdaabaefcbb23b7b10))
+* update app icon ([23bf891](https://github.com/jsanzdev/work-hours-tracker/commit/23bf8911ec47be69b3605cd379c1b909f4122658))
+* update app icon and improve icon handling in Electron app ([9e84766](https://github.com/jsanzdev/work-hours-tracker/commit/9e8476601997de6da794e04aa5111241e2dab082))
+
+
+### Bug Fixes
+
+* update tsconfig to include ignoreDeprecations option ([7596d7c](https://github.com/jsanzdev/work-hours-tracker/commit/7596d7c14cd0750b02ef10232a0f7e9dbc0c5767))
