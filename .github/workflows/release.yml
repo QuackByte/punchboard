@@ -65,16 +65,23 @@ jobs:
       - name: Build app
         run: npm run build && npx electron-builder ${{ matrix.platform.build_args }} --publish never
 
+      - name: Verify macOS updater metadata
+        if: matrix.platform.name == 'macOS'
+        shell: bash
+        run: |
+          test -f dist/latest-mac.yml
+          compgen -G "dist/*.zip.blockmap" > /dev/null
+
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          # Upload only app installers, not icons or build artifacts
+          # Upload app installers and electron-updater metadata, not icons or web assets.
           files=()
           while IFS= read -r -d '' file; do
             files+=("$file")
-          done < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" \) -print0 | sort -z)
+          done < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.yml" -o -name "*.blockmap" \) -print0 | sort -z)
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release assets found in dist/"

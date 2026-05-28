@@ -13,6 +13,11 @@ const __dirname = path.dirname(__filename);
 const APP_CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
+type AutoUpdaterEvents = {
+  on(event: "error", listener: (error: Error, message?: string) => void): void;
+  on(event: "update-downloaded", listener: () => void): void;
+};
+
 function readAppConfig(): { dataFilePath?: string } {
   try {
     const raw = fs.readFileSync(APP_CONFIG_PATH, "utf8");
@@ -134,14 +139,16 @@ function createMainWindow() {
 function setupAutoUpdates() {
   if (!app.isPackaged) return;
 
+  const updaterEvents = autoUpdater as typeof autoUpdater & AutoUpdaterEvents;
+
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on("error", (error) => {
+  updaterEvents.on("error", (error) => {
     console.error("Auto-update failed", error);
   });
 
-  autoUpdater.on("update-downloaded", async () => {
+  updaterEvents.on("update-downloaded", async () => {
     const result = await dialog.showMessageBox({
       type: "info",
       title: "Update ready",
