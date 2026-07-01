@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.4...work-hours-tracker-v1.2.0) (2026-07-01)
+
+
+### Features
+
+* sign and notarize macOS release builds ([765e6a6](https://github.com/jsanzdev/work-hours-tracker/commit/765e6a6a7f216fd44c6dd06079a1e98693c51c1b))
+* track weekend/extra hours, add currency conversion, and redesign the dashboard ([1d227de](https://github.com/jsanzdev/work-hours-tracker/commit/1d227de4e2343de7adaf06542485f4cb5bc0cd5a))
+
 ## [1.1.4](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.3...work-hours-tracker-v1.1.4) (2026-05-28)
 
 
