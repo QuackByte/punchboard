@@ -19,7 +19,7 @@ export default function YearlyOverview({
   );
 
   return (
-    <div className="mx-auto mt-8 w-full max-w-6xl rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+    <div className="mt-8 w-full rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
           Yearly Overview

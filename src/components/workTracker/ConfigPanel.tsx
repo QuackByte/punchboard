@@ -1,24 +1,30 @@
-import { useRef } from "react";
-import { ActivityLogEntry, DayKey, daysOfWeek } from "./types";
-import ThemeToggle from "./ThemeToggle";
-import { Theme } from "./useTheme";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  ActivityLogEntry,
+  CurrencyCode,
+  DayKey,
+  currencyOptions,
+  daysOfWeek,
+} from "./types";
 import { clampDay, clampPercent } from "./utils";
 
 interface ConfigPanelProps {
-  theme: Theme;
-  onThemeChange: (theme: Theme) => void;
   savedMonthsCount: number;
   lastSavedAt: string;
-  monthKey: string;
-  onMonthChange: (month: string) => void;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
+  onClose: () => void;
   selectedDays: DayKey[];
   onToggleDay: (key: DayKey) => void;
   hoursPerDay: number;
   onHoursPerDayChange: (value: number) => void;
   hourlyRate: number;
   onHourlyRateChange: (value: number) => void;
+  currency: CurrencyCode;
+  onCurrencyChange: (value: CurrencyCode) => void;
+  secondaryCurrency: CurrencyCode;
+  onSecondaryCurrencyChange: (value: CurrencyCode) => void;
+  conversionRate: number;
+  onConversionRateChange: (value: number) => void;
   taxPercent: number;
   onTaxPercentChange: (value: number) => void;
   extraDeduction: number;
@@ -35,21 +41,51 @@ interface ConfigPanelProps {
   onChangeFile: () => void;
 }
 
+const inputClass =
+  "mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+const labelClass = "text-sm font-medium text-slate-600 dark:text-slate-300";
+
+function Section({
+  title,
+  children,
+  first = false,
+}: {
+  title: string;
+  children: ReactNode;
+  first?: boolean;
+}) {
+  return (
+    <div
+      className={
+        first
+          ? "mt-6"
+          : "mt-6 border-t border-slate-200 pt-6 dark:border-slate-800"
+      }
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        {title}
+      </p>
+      <div className="mt-3 space-y-4">{children}</div>
+    </div>
+  );
+}
+
 export default function ConfigPanel({
-  theme,
-  onThemeChange,
   savedMonthsCount,
   lastSavedAt,
-  monthKey,
-  onMonthChange,
-  onPrevMonth,
-  onNextMonth,
+  onClose,
   selectedDays,
   onToggleDay,
   hoursPerDay,
   onHoursPerDayChange,
   hourlyRate,
   onHourlyRateChange,
+  currency,
+  onCurrencyChange,
+  secondaryCurrency,
+  onSecondaryCurrencyChange,
+  conversionRate,
+  onConversionRateChange,
   taxPercent,
   onTaxPercentChange,
   extraDeduction,
@@ -66,6 +102,22 @@ export default function ConfigPanel({
   onChangeFile,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -78,105 +130,91 @@ export default function ConfigPanel({
       event.target.value = "";
     }
   };
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          Work Hours Tracker
-        </h1>
-        <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
-      </div>
-      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Configure your month, global payslip start day, and weekday schedule.
-      </p>
-      <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-        {isFileMode ? (
-          <>
-            <span
-              className="block truncate"
-              title={filePath}
-            >
-              📁 {filePath || "No file chosen"}
-            </span>
-            <span>
-              Months saved: {savedMonthsCount} | Last save:{" "}
-              {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
-            </span>
-          </>
-        ) : (
-          <>
-            Saved months: {savedMonthsCount} | Last save:{" "}
-            {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
-          </>
-        )}
-      </p>
 
-      <div className="mt-3 flex gap-2">
-        {isFileMode && (
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex justify-end bg-slate-950/50"
+      onClick={onClose}
+    >
+      <section
+        onClick={(event) => event.stopPropagation()}
+        className={`h-full w-full max-w-sm overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-xl transition-transform duration-200 ease-out dark:border-slate-800 dark:bg-slate-900 ${
+          entered ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            Settings
+          </h2>
           <button
             type="button"
-            onClick={onChangeFile}
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+            onClick={onClose}
+            aria-label="Hide settings"
+            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500"
           >
-            Change file
+            ✕
           </button>
-        )}
-        <button
-          type="button"
-          onClick={onExportData}
-          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
-        >
-          {isFileMode ? "Save backup copy" : "Export backup"}
-        </button>
-        <button
-          type="button"
-          onClick={handleImportClick}
-          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
-        >
-          {isFileMode ? "Restore backup" : "Import backup"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </div>
-
-      <div className="mt-6 space-y-4">
-        <div>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Payslip month (finishing month)
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onPrevMonth}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-500"
-            >
-              Prev
-            </button>
-            <input
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              type="month"
-              value={monthKey}
-              onChange={(event) => onMonthChange(event.target.value)}
-            />
-            <button
-              type="button"
-              onClick={onNextMonth}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-500"
-            >
-              Next
-            </button>
-          </div>
         </div>
 
+      <Section title="File" first>
+        <p className="text-xs text-slate-400 dark:text-slate-500">
+          {isFileMode ? (
+            <>
+              <span className="block truncate" title={filePath}>
+                📁 {filePath || "No file chosen"}
+              </span>
+              <span>
+                Months saved: {savedMonthsCount} | Last save:{" "}
+                {lastSavedAt
+                  ? new Date(lastSavedAt).toLocaleString()
+                  : "not yet"}
+              </span>
+            </>
+          ) : (
+            <>
+              Saved months: {savedMonthsCount} | Last save:{" "}
+              {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "not yet"}
+            </>
+          )}
+        </p>
+
+        <div className="flex gap-2">
+          {isFileMode && (
+            <button
+              type="button"
+              onClick={onChangeFile}
+              className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+            >
+              Change file
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onExportData}
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+          >
+            {isFileMode ? "Save backup copy" : "Export backup"}
+          </button>
+          <button
+            type="button"
+            onClick={handleImportClick}
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
+          >
+            {isFileMode ? "Restore backup" : "Import backup"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
+      </Section>
+
+      <Section title="Schedule">
         <div>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Working weekdays
-          </p>
+          <p className={labelClass}>Working weekdays</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {daysOfWeek.map((day) => {
               const active = selectedDays.includes(day.key);
@@ -198,11 +236,27 @@ export default function ConfigPanel({
           </div>
         </div>
 
+        <label className={labelClass}>
+          Payslip start day
+          <input
+            className={inputClass}
+            type="number"
+            min={1}
+            max={31}
+            value={payslipStartDay}
+            onChange={(event) =>
+              onPayslipStartDayChange(clampDay(Number(event.target.value)))
+            }
+          />
+        </label>
+      </Section>
+
+      <Section title="Pay & currency">
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          <label className={labelClass}>
             Hours/day
             <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className={inputClass}
               type="number"
               min={0}
               value={hoursPerDay}
@@ -212,10 +266,10 @@ export default function ConfigPanel({
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          <label className={labelClass}>
             Rate (per hour)
             <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className={inputClass}
               type="number"
               min={0}
               value={hourlyRate}
@@ -225,10 +279,10 @@ export default function ConfigPanel({
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          <label className={labelClass}>
             Tax (%)
             <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className={inputClass}
               type="number"
               min={0}
               max={100}
@@ -240,10 +294,10 @@ export default function ConfigPanel({
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          <label className={labelClass}>
             Extra deduction
             <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className={inputClass}
               type="number"
               min={0}
               step={0.01}
@@ -254,24 +308,10 @@ export default function ConfigPanel({
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Payslip start day
-            <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              type="number"
-              min={1}
-              max={31}
-              value={payslipStartDay}
-              onChange={(event) =>
-                onPayslipStartDayChange(clampDay(Number(event.target.value)))
-              }
-            />
-          </label>
-
           <label className="col-span-2 text-sm font-medium text-slate-600 dark:text-slate-300">
             Holiday hours/day
             <input
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className={inputClass}
               type="number"
               min={0}
               value={defaultHours}
@@ -282,28 +322,79 @@ export default function ConfigPanel({
           </label>
         </div>
 
+        <div>
+          <p className={labelClass}>Currency conversion</p>
+          <div className="mt-2 flex items-center gap-2">
+            <select
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              value={currency}
+              onChange={(event) =>
+                onCurrencyChange(event.target.value as CurrencyCode)
+              }
+            >
+              {currencyOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.code} ({option.symbol})
+                </option>
+              ))}
+            </select>
+            <span className="shrink-0 text-slate-400 dark:text-slate-500">
+              →
+            </span>
+            <select
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              value={secondaryCurrency}
+              onChange={(event) =>
+                onSecondaryCurrencyChange(event.target.value as CurrencyCode)
+              }
+            >
+              {currencyOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.code} ({option.symbol})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <label className="mt-3 block text-sm font-medium text-slate-600 dark:text-slate-300">
+            Conversion rate ({currency} → {secondaryCurrency})
+            <input
+              className={inputClass}
+              type="number"
+              min={0}
+              step={0.0001}
+              disabled={currency === secondaryCurrency}
+              value={conversionRate}
+              onChange={(event) =>
+                onConversionRateChange(Number(event.target.value))
+              }
+            />
+          </label>
+        </div>
+      </Section>
+
+      <Section title="Recent activity">
         <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-          <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Recent activity
-          </p>
-          <div className="mt-2 space-y-1">
-            {recentActivity.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">
-                No activity yet.
-              </p>
-            ) : (
-              recentActivity.map((entry) => (
+          {recentActivity.length === 0 ? (
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              No activity yet.
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {recentActivity.map((entry) => (
                 <p
                   key={entry.id}
                   className="text-xs text-slate-600 dark:text-slate-300"
                 >
                   {new Date(entry.timestamp).toLocaleString()} - {entry.message}
                 </p>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-    </section>
+      </Section>
+      </section>
+    </div>,
+    document.body,
   );
 }
