@@ -9,13 +9,13 @@ export const daysOfWeek = [
 ] as const;
 
 export const calendarHeaders = [
-  "Sun",
   "Mon",
   "Tue",
   "Wed",
   "Thu",
   "Fri",
   "Sat",
+  "Sun",
 ] as const;
 
 export const weekdayMap = [
@@ -28,9 +28,20 @@ export const weekdayMap = [
   "sat",
 ] as const;
 
+export const currencyOptions = [
+  { code: "GBP", symbol: "£" },
+  { code: "EUR", symbol: "€" },
+  { code: "USD", symbol: "$" },
+] as const;
+
+export type CurrencyCode = (typeof currencyOptions)[number]["code"];
+
+export function getCurrencySymbol(currency: CurrencyCode) {
+  return currencyOptions.find((option) => option.code === currency)!.symbol;
+}
+
 export type DayKey = (typeof daysOfWeek)[number]["key"];
 export type ExceptionType = "vacation" | "sick";
-export type MarkMode = ExceptionType | "none";
 export type ActivityType =
   | "month-change"
   | "weekday-toggle"
@@ -42,11 +53,15 @@ export interface TrackerData {
   selectedDays: DayKey[];
   hoursPerDay: number;
   hourlyRate: number;
+  currency: CurrencyCode;
+  secondaryCurrency: CurrencyCode;
+  conversionRate: number;
   taxPercent: number;
   extraDeduction: number;
   defaultHours: number;
   exceptions: Record<string, ExceptionType>;
   dailyHours: Record<string, number>;
+  extraHours: Record<string, number>;
 }
 
 export interface TrackerSettings {

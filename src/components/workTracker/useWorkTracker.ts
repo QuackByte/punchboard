@@ -3,10 +3,10 @@ import {
   ACTIVITY_LOG_KEY,
   ActivityLogEntry,
   ActivityType,
+  CurrencyCode,
   DataFile,
   DayKey,
   ExceptionType,
-  MarkMode,
   SAVED_MONTHS_KEY,
   SETTINGS_KEY,
   TrackerData,
@@ -39,6 +39,9 @@ export function useWorkTracker() {
   const DEFAULT_HOURLY_RATE = 15;
   const DEFAULT_TAX_PERCENT = 0;
   const DEFAULT_DEFAULT_HOURS = 8;
+  const DEFAULT_CURRENCY: CurrencyCode = "GBP";
+  const DEFAULT_SECONDARY_CURRENCY: CurrencyCode = "EUR";
+  const DEFAULT_CONVERSION_RATE = 1;
 
   const [monthKey, setMonthKey] = useState<string>(initialUiState.monthKey);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([
@@ -50,15 +53,22 @@ export function useWorkTracker() {
   ]);
   const [hoursPerDay, setHoursPerDay] = useState<number>(8);
   const [hourlyRate, setHourlyRate] = useState<number>(15);
+  const [currency, setCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [secondaryCurrency, setSecondaryCurrency] = useState<CurrencyCode>(
+    DEFAULT_SECONDARY_CURRENCY,
+  );
+  const [conversionRate, setConversionRate] = useState<number>(
+    DEFAULT_CONVERSION_RATE,
+  );
   const [taxPercent, setTaxPercent] = useState<number>(0);
   const [extraDeduction, setExtraDeduction] = useState<number>(0);
   const [payslipStartDay, setPayslipStartDay] = useState<number>(21);
   const [defaultHours, setDefaultHours] = useState<number>(8);
-  const [exceptionMode, setExceptionMode] = useState<MarkMode>("none");
   const [exceptions, setExceptions] = useState<Record<string, ExceptionType>>(
     {},
   );
   const [dailyHours, setDailyHours] = useState<Record<string, number>>({});
+  const [extraHours, setExtraHours] = useState<Record<string, number>>({});
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [savedMonths, setSavedMonths] = useState<string[]>([]);
   const [lastSavedAt, setLastSavedAt] = useState<string>("");
@@ -196,6 +206,13 @@ export function useWorkTracker() {
               typeof data.defaultHours === "number"
                 ? Math.max(0, data.defaultHours)
                 : DEFAULT_DEFAULT_HOURS,
+            currency: data.currency ?? DEFAULT_CURRENCY,
+            secondaryCurrency:
+              data.secondaryCurrency ?? DEFAULT_SECONDARY_CURRENCY,
+            conversionRate:
+              typeof data.conversionRate === "number"
+                ? Math.max(0, data.conversionRate)
+                : DEFAULT_CONVERSION_RATE,
           };
         }
       } catch {
@@ -207,11 +224,14 @@ export function useWorkTracker() {
       hourlyRate: DEFAULT_HOURLY_RATE,
       taxPercent: DEFAULT_TAX_PERCENT,
       defaultHours: DEFAULT_DEFAULT_HOURS,
+      currency: DEFAULT_CURRENCY,
+      secondaryCurrency: DEFAULT_SECONDARY_CURRENCY,
+      conversionRate: DEFAULT_CONVERSION_RATE,
     };
   };
 
   const updateCurrentAndFutureMonthsGlobalValue = (
-    field: "hourlyRate" | "taxPercent" | "defaultHours",
+    field: "hourlyRate" | "taxPercent" | "defaultHours" | "conversionRate",
     value: number,
   ) => {
     const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
@@ -228,6 +248,28 @@ export function useWorkTracker() {
           ...data,
           [field]: value,
         };
+        safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
+      } catch {
+        // ignore corrupted month data
+      }
+    });
+  };
+
+  const updateCurrentAndFutureMonthsCurrency = (
+    field: "currency" | "secondaryCurrency",
+    value: CurrencyCode,
+  ) => {
+    const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
+
+    monthsToUpdate.forEach((mk) => {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (!raw) {
+        return;
+      }
+
+      try {
+        const data = JSON.parse(raw) as TrackerData;
+        const nextData: TrackerData = { ...data, [field]: value };
         safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
       } catch {
         // ignore corrupted month data
@@ -367,6 +409,25 @@ export function useWorkTracker() {
     addActivity("value-change", `Updated hourly rate to ${clamped}`);
   };
 
+  const onCurrencyChange = (value: CurrencyCode) => {
+    setCurrency(value);
+    updateCurrentAndFutureMonthsCurrency("currency", value);
+    addActivity("value-change", `Updated currency to ${value}`);
+  };
+
+  const onSecondaryCurrencyChange = (value: CurrencyCode) => {
+    setSecondaryCurrency(value);
+    updateCurrentAndFutureMonthsCurrency("secondaryCurrency", value);
+    addActivity("value-change", `Updated secondary currency to ${value}`);
+  };
+
+  const onConversionRateChange = (value: number) => {
+    const clamped = Math.max(0, value || 0);
+    setConversionRate(clamped);
+    updateCurrentAndFutureMonthsGlobalValue("conversionRate", clamped);
+    addActivity("value-change", `Updated conversion rate to ${clamped}`);
+  };
+
   const onTaxPercentChange = (value: number) => {
     const clamped = clampPercent(value);
     setTaxPercent(clamped);
@@ -446,6 +507,17 @@ export function useWorkTracker() {
   }, [monthKey, graphYear]);
 
   useEffect(() => {
+    // In file mode, wait for the remembered/chosen file to actually finish
+    // loading before hydrating a month. Otherwise this can run once with
+    // whatever (possibly empty) localStorage cache exists pre-load, decide
+    // the month has no data, and write defaults into that month's cache
+    // before the real file data has populated it — permanently masking the
+    // real data once the file does load (the write "sticks" as if it were a
+    // real saved month).
+    if (isFileMode && !fileInitialized) {
+      return;
+    }
+
     setIsMonthHydrated(false);
 
     const saved = safeStorageGetItem(`tracker-${monthKey}`);
@@ -456,11 +528,15 @@ export function useWorkTracker() {
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
       setHoursPerDay(8);
       setHourlyRate(carryForward.hourlyRate);
+      setCurrency(carryForward.currency);
+      setSecondaryCurrency(carryForward.secondaryCurrency);
+      setConversionRate(carryForward.conversionRate);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
+      setExtraHours({});
       setIsMonthHydrated(true);
       return;
     }
@@ -475,6 +551,13 @@ export function useWorkTracker() {
       setSelectedDays(data.selectedDays);
       setHoursPerDay(data.hoursPerDay);
       setHourlyRate(data.hourlyRate);
+      setCurrency(data.currency ?? DEFAULT_CURRENCY);
+      setSecondaryCurrency(data.secondaryCurrency ?? DEFAULT_SECONDARY_CURRENCY);
+      setConversionRate(
+        typeof data.conversionRate === "number"
+          ? data.conversionRate
+          : DEFAULT_CONVERSION_RATE,
+      );
       setTaxPercent(data.taxPercent ?? 0);
       setExtraDeduction(data.extraDeduction ?? 0);
       setDefaultHours(
@@ -484,21 +567,26 @@ export function useWorkTracker() {
       );
       setExceptions(data.exceptions ?? {});
       setDailyHours(data.dailyHours ?? {});
+      setExtraHours(data.extraHours ?? {});
     } catch {
       safeStorageRemoveItem(`tracker-${monthKey}`);
       const carryForward = getCarryForwardGlobalValues(monthKey);
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
       setHoursPerDay(8);
       setHourlyRate(carryForward.hourlyRate);
+      setCurrency(carryForward.currency);
+      setSecondaryCurrency(carryForward.secondaryCurrency);
+      setConversionRate(carryForward.conversionRate);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
+      setExtraHours({});
     } finally {
       setIsMonthHydrated(true);
     }
-  }, [monthKey]);
+  }, [monthKey, fileInitialized]);
 
   useEffect(() => {
     if (!isMonthHydrated) {
@@ -509,11 +597,15 @@ export function useWorkTracker() {
       selectedDays,
       hoursPerDay,
       hourlyRate,
+      currency,
+      secondaryCurrency,
+      conversionRate,
       taxPercent,
       extraDeduction,
       defaultHours,
       exceptions,
       dailyHours,
+      extraHours,
     };
 
     safeStorageSetItem(`tracker-${monthKey}`, JSON.stringify(data));
@@ -532,11 +624,15 @@ export function useWorkTracker() {
     selectedDays,
     hoursPerDay,
     hourlyRate,
+    currency,
+    secondaryCurrency,
+    conversionRate,
     taxPercent,
     extraDeduction,
     defaultHours,
     exceptions,
     dailyHours,
+    extraHours,
     monthKey,
     isMonthHydrated,
   ]);
@@ -551,11 +647,15 @@ export function useWorkTracker() {
       selectedDays,
       hoursPerDay,
       hourlyRate,
+      currency,
+      secondaryCurrency,
+      conversionRate,
       taxPercent,
       extraDeduction,
       defaultHours,
       exceptions,
       dailyHours,
+      extraHours,
     };
 
     const payload = buildFilePayload(
@@ -579,11 +679,15 @@ export function useWorkTracker() {
     selectedDays,
     hoursPerDay,
     hourlyRate,
+    currency,
+    secondaryCurrency,
+    conversionRate,
     taxPercent,
     extraDeduction,
     defaultHours,
     exceptions,
     dailyHours,
+    extraHours,
     monthKey,
     graphYear,
     payslipStartDay,
@@ -616,29 +720,6 @@ export function useWorkTracker() {
     return { workingDaysCount: workingDates.length, vacationDays, sickDays };
   }, [workingDates, exceptions]);
 
-  const actualHours = useMemo(
-    () =>
-      workingDates.reduce((total, date) => {
-        const key = dateKey(date);
-        if (exceptions[key] === "sick") {
-          return total;
-        }
-        if (exceptions[key] === "vacation") {
-          const manualHours = dailyHours[key] ?? 0;
-          return total + defaultHours + clampHours(manualHours);
-        }
-        const dayHours = dailyHours[key] ?? hoursPerDay;
-        return total + clampHours(dayHours);
-      }, 0),
-    [workingDates, exceptions, dailyHours, hoursPerDay, defaultHours],
-  );
-
-  const estimatedHours = workingDates.length * hoursPerDay;
-  const grossSalary = actualHours * hourlyRate;
-  const taxAmount = grossSalary * (clampPercent(taxPercent) / 100);
-  const extraDeductionAmount = Math.max(0, extraDeduction);
-  const netSalary = Math.max(0, grossSalary - taxAmount - extraDeductionAmount);
-
   const workingDateLookup = useMemo(() => {
     const lookup = new Set<string>();
     workingDates.forEach((date) => {
@@ -656,19 +737,62 @@ export function useWorkTracker() {
     return lookup;
   }, [monthKey, payslipStartDay]);
 
-  const applyException = (key: string) => {
+  const extraHoursTotal = useMemo(() => {
+    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
+    return rangeDates.reduce((total, date) => {
+      const key = dateKey(date);
+      if (workingDateLookup.has(key)) {
+        return total;
+      }
+      return total + clampHours(extraHours[key] ?? 0);
+    }, 0);
+  }, [monthKey, payslipStartDay, workingDateLookup, extraHours]);
+
+  const actualHours = useMemo(
+    () =>
+      workingDates.reduce((total, date) => {
+        const key = dateKey(date);
+        if (exceptions[key] === "sick") {
+          return total;
+        }
+        if (exceptions[key] === "vacation") {
+          const manualHours = dailyHours[key] ?? 0;
+          return total + defaultHours + clampHours(manualHours);
+        }
+        const dayHours = dailyHours[key] ?? hoursPerDay;
+        return total + clampHours(dayHours);
+      }, extraHoursTotal),
+    [
+      workingDates,
+      exceptions,
+      dailyHours,
+      hoursPerDay,
+      defaultHours,
+      extraHoursTotal,
+    ],
+  );
+
+  const estimatedHours = workingDates.length * hoursPerDay;
+  const grossSalary = actualHours * hourlyRate;
+  const taxAmount = grossSalary * (clampPercent(taxPercent) / 100);
+  const extraDeductionAmount = Math.max(0, extraDeduction);
+  const netSalary = Math.max(0, grossSalary - taxAmount - extraDeductionAmount);
+  const convertedGrossSalary = grossSalary * conversionRate;
+  const convertedNetSalary = netSalary * conversionRate;
+
+  const setDayException = (key: string, type: ExceptionType | "none") => {
     if (!workingDateLookup.has(key)) {
       return;
     }
 
     setExceptions((previous) => {
       const next = { ...previous };
-      if (exceptionMode === "none" || previous[key] === exceptionMode) {
+      if (type === "none" || previous[key] === type) {
         delete next[key];
         addActivity("exception-change", `Cleared mark on ${key}`);
       } else {
-        next[key] = exceptionMode;
-        addActivity("exception-change", `Marked ${key} as ${exceptionMode}`);
+        next[key] = type;
+        addActivity("exception-change", `Marked ${key} as ${type}`);
       }
       return next;
     });
@@ -682,6 +806,22 @@ export function useWorkTracker() {
     const nextValue = clampHours(value);
     setDailyHours((previous) => ({ ...previous, [key]: nextValue }));
     addActivity("hours-change", `Updated ${key} hours to ${nextValue}`);
+  };
+
+  const updateExtraHours = (key: string, value: number) => {
+    if (!payslipDateLookup.has(key) || workingDateLookup.has(key)) {
+      return;
+    }
+
+    const nextValue = clampHours(value);
+    setExtraHours((previous) => {
+      if (nextValue === 0) {
+        const { [key]: _removed, ...rest } = previous;
+        return rest;
+      }
+      return { ...previous, [key]: nextValue };
+    });
+    addActivity("hours-change", `Logged ${nextValue} extra hours on ${key}`);
   };
 
   const recentActivity = useMemo(() => activityLog.slice(0, 8), [activityLog]);
@@ -730,6 +870,8 @@ export function useWorkTracker() {
                 const hours = data.dailyHours[key] ?? data.hoursPerDay;
                 totalActualHours += clampHours(hours);
               }
+            } else if (!isWorkingDay) {
+              totalActualHours += clampHours(data.extraHours?.[key] ?? 0);
             }
           });
 
@@ -758,7 +900,8 @@ export function useWorkTracker() {
     }
 
     const firstDate = rangeDates[0];
-    const dayOfWeek = firstDate.getDay();
+    // Monday-first offset: Date#getDay() is Sunday-indexed (0=Sun..6=Sat).
+    const dayOfWeek = (firstDate.getDay() + 6) % 7;
     for (let index = 0; index < dayOfWeek; index += 1) {
       cells.push(null);
     }
@@ -791,11 +934,15 @@ export function useWorkTracker() {
       selectedDays,
       hoursPerDay,
       hourlyRate,
+      currency,
+      secondaryCurrency,
+      conversionRate,
       taxPercent,
       extraDeduction,
       defaultHours,
       exceptions,
       dailyHours,
+      extraHours,
     };
 
     const payload = buildFilePayload(
@@ -850,14 +997,17 @@ export function useWorkTracker() {
     selectedDays,
     hoursPerDay,
     hourlyRate,
+    currency,
+    secondaryCurrency,
+    conversionRate,
     taxPercent,
     extraDeduction,
     payslipStartDay,
     defaultHours,
-    exceptionMode,
-    setExceptionMode,
     exceptions,
     dailyHours,
+    extraHours,
+    extraHoursTotal,
     savedMonths,
     lastSavedAt,
     graphYear,
@@ -867,6 +1017,9 @@ export function useWorkTracker() {
     toggleDay,
     onHoursPerDayChange,
     onHourlyRateChange,
+    onCurrencyChange,
+    onSecondaryCurrencyChange,
+    onConversionRateChange,
     onTaxPercentChange,
     onExtraDeductionChange,
     onPayslipStartDayChange,
@@ -878,10 +1031,13 @@ export function useWorkTracker() {
     taxAmount,
     extraDeductionAmount,
     netSalary,
+    convertedGrossSalary,
+    convertedNetSalary,
     payslipDateLookup,
     workingDateLookup,
-    applyException,
+    setDayException,
     updateDayHours,
+    updateExtraHours,
     recentActivity,
     yearlyData,
     calendarCells,

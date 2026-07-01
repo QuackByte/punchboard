@@ -32,12 +32,18 @@
       "public/**/*",
       "package.json"
     ],
+    "afterPack": "build-resources/afterPack.cjs",
     "mac": {
       "icon": "public/WorkHoursTracker.icns",
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build-resources/entitlements.mac.plist",
+      "entitlementsInherit": "build-resources/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
@@ -52,23 +58,23 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.6.2",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "electron-updater": "^6.8.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
-    "@vitejs/plugin-react": "^4.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.4.27",
     "concurrently": "^9.2.1",
-    "electron": "^37.2.4",
-    "electron-builder": "^26.0.12",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.0.0",
-    "vite": "^5.0.0",
+    "vite": "^8.1.2",
     "wait-on": "^8.0.5"
   }
 }

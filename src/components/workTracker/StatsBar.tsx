@@ -1,13 +1,49 @@
+import { ReactNode } from "react";
+import { CurrencyCode, getCurrencySymbol } from "./types";
+
 interface StatsBarProps {
   workingDaysCount: number;
   vacationDays: number;
   sickDays: number;
   actualHours: number;
   estimatedHours: number;
+  extraHoursTotal: number;
+  currency: CurrencyCode;
+  secondaryCurrency: CurrencyCode;
   grossSalary: number;
   taxAmount: number;
   extraDeductionAmount: number;
   netSalary: number;
+  convertedGrossSalary: number;
+  convertedNetSalary: number;
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  accentClass,
+  spanClass = "",
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  accentClass: string;
+  spanClass?: string;
+}) {
+  return (
+    <div
+      className={`rounded-lg border border-l-4 border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-950/70 ${accentClass} ${spanClass}`}
+    >
+      <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
+        {value}
+      </p>
+      {sub}
+    </div>
+  );
 }
 
 export default function StatsBar({
@@ -16,84 +52,112 @@ export default function StatsBar({
   sickDays,
   actualHours,
   estimatedHours,
+  extraHoursTotal,
+  currency,
+  secondaryCurrency,
   grossSalary,
   taxAmount,
   extraDeductionAmount,
   netSalary,
+  convertedGrossSalary,
+  convertedNetSalary,
 }: StatsBarProps) {
+  const symbol = getCurrencySymbol(currency);
+  const secondarySymbol = getCurrencySymbol(secondaryCurrency);
+  const showConversion = currency !== secondaryCurrency;
+
   return (
-    <div className="mb-4 flex flex-wrap justify-center gap-3">
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-950/70 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Working days
+    <div className="mb-4 space-y-4">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          Hours
         </p>
-        <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
-          {workingDaysCount}
-        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-12">
+          <StatCard
+            label="Working days"
+            value={workingDaysCount}
+            accentClass="border-l-slate-300 dark:border-l-slate-600"
+            spanClass="lg:col-span-2"
+          />
+          <StatCard
+            label="Vacation"
+            value={vacationDays}
+            accentClass="border-l-amber-400 dark:border-l-amber-500"
+            spanClass="lg:col-span-2"
+          />
+          <StatCard
+            label="Sick"
+            value={sickDays}
+            accentClass="border-l-rose-400 dark:border-l-rose-500"
+            spanClass="lg:col-span-2"
+          />
+          <StatCard
+            label="Actual hours"
+            value={actualHours}
+            accentClass="border-l-slate-300 dark:border-l-slate-600"
+            spanClass="lg:col-span-2"
+          />
+          <StatCard
+            label="Estimated hours"
+            value={estimatedHours}
+            accentClass="border-l-slate-300 dark:border-l-slate-600"
+            spanClass="lg:col-span-2"
+          />
+          <StatCard
+            label="Extra hours"
+            value={extraHoursTotal}
+            accentClass="border-l-indigo-400 dark:border-l-indigo-500"
+            spanClass="lg:col-span-2"
+          />
+        </div>
       </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-amber-400/60 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-200">
-          Vacation
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          Pay
         </p>
-        <p className="mt-1 text-xl font-semibold text-amber-800 dark:text-amber-100">
-          {vacationDays}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-rose-400/60 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-rose-700 dark:text-rose-200">
-          Sick
-        </p>
-        <p className="mt-1 text-xl font-semibold text-rose-800 dark:text-rose-100">
-          {sickDays}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-950/70 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Actual hours
-        </p>
-        <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
-          {actualHours}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-950/70 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Estimated hours
-        </p>
-        <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
-          {estimatedHours}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-cyan-400/60 bg-cyan-50 p-3 dark:border-cyan-500/50 dark:bg-cyan-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-cyan-700 dark:text-cyan-200">
-          Gross pay
-        </p>
-        <p className="mt-1 text-xl font-semibold text-cyan-800 dark:text-cyan-100">
-          {grossSalary.toFixed(2)}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-orange-400/60 bg-orange-50 p-3 dark:border-orange-500/40 dark:bg-orange-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-orange-700 dark:text-orange-200">
-          Tax amount
-        </p>
-        <p className="mt-1 text-xl font-semibold text-orange-800 dark:text-orange-100">
-          {taxAmount.toFixed(2)}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-violet-400/60 bg-violet-50 p-3 dark:border-violet-500/40 dark:bg-violet-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-violet-700 dark:text-violet-200">
-          Deductions
-        </p>
-        <p className="mt-1 text-xl font-semibold text-violet-800 dark:text-violet-100">
-          {extraDeductionAmount.toFixed(2)}
-        </p>
-      </div>
-      <div className="w-full min-w-[170px] flex-1 rounded-lg border border-emerald-400/60 bg-emerald-50 p-3 dark:border-emerald-500/40 dark:bg-emerald-500/10 sm:max-w-[220px]">
-        <p className="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-200">
-          Net pay
-        </p>
-        <p className="mt-1 text-xl font-semibold text-emerald-800 dark:text-emerald-100">
-          {netSalary.toFixed(2)}
-        </p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-12">
+          <StatCard
+            label="Gross pay"
+            value={`${symbol}${grossSalary.toFixed(2)}`}
+            accentClass="border-l-cyan-400 dark:border-l-cyan-500"
+            spanClass="lg:col-span-3"
+            sub={
+              showConversion ? (
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  ≈ {secondarySymbol}
+                  {convertedGrossSalary.toFixed(2)}
+                </p>
+              ) : undefined
+            }
+          />
+          <StatCard
+            label="Tax amount"
+            value={`${symbol}${taxAmount.toFixed(2)}`}
+            accentClass="border-l-orange-400 dark:border-l-orange-500"
+            spanClass="lg:col-span-3"
+          />
+          <StatCard
+            label="Deductions"
+            value={`${symbol}${extraDeductionAmount.toFixed(2)}`}
+            accentClass="border-l-violet-400 dark:border-l-violet-500"
+            spanClass="lg:col-span-3"
+          />
+          <StatCard
+            label="Net pay"
+            value={`${symbol}${netSalary.toFixed(2)}`}
+            accentClass="border-l-emerald-400 dark:border-l-emerald-500"
+            spanClass="lg:col-span-3"
+            sub={
+              showConversion ? (
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  ≈ {secondarySymbol}
+                  {convertedNetSalary.toFixed(2)}
+                </p>
+              ) : undefined
+            }
+          />
+        </div>
       </div>
     </div>
   );
