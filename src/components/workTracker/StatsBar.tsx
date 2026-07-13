@@ -1,4 +1,6 @@
 import { ReactNode } from "react";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { CurrencyCode, getCurrencySymbol } from "./types";
 
 interface StatsBarProps {
@@ -32,17 +34,15 @@ function StatCard({
   spanClass?: string;
 }) {
   return (
-    <div
-      className={`rounded-lg border border-l-4 border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-950/70 ${accentClass} ${spanClass}`}
+    <Card
+      className={cn("border-l-4 bg-card/70 p-3 shadow-none", accentClass, spanClass)}
     >
-      <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
-        {value}
-      </p>
+      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
       {sub}
-    </div>
+    </Card>
   );
 }
 
@@ -69,7 +69,7 @@ export default function StatsBar({
   return (
     <div className="mb-4 space-y-4">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Hours
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-12">
@@ -113,7 +113,7 @@ export default function StatsBar({
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Pay
         </p>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-12">
@@ -124,7 +124,7 @@ export default function StatsBar({
             spanClass="lg:col-span-3"
             sub={
               showConversion ? (
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   ≈ {secondarySymbol}
                   {convertedGrossSalary.toFixed(2)}
                 </p>
@@ -150,7 +150,7 @@ export default function StatsBar({
             spanClass="lg:col-span-3"
             sub={
               showConversion ? (
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   ≈ {secondarySymbol}
                   {convertedNetSalary.toFixed(2)}
                 </p>

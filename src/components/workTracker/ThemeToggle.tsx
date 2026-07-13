@@ -1,3 +1,4 @@
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Theme } from "./useTheme";
 
 interface ThemeToggleProps {
@@ -16,21 +17,21 @@ export default function ThemeToggle({
   onThemeChange,
 }: ThemeToggleProps) {
   return (
-    <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onThemeChange(option.value)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-            theme === option.value
-              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
-              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <Tabs
+      value={theme}
+      onValueChange={(value) => onThemeChange(value as Theme)}
+    >
+      <TabsList className="h-8 p-0.5">
+        {options.map((option) => (
+          <TabsTrigger
+            key={option.value}
+            value={option.value}
+            className="px-2.5 py-1 text-xs"
+          >
+            {option.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }

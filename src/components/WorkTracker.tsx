@@ -1,3 +1,7 @@
+import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import CalendarGrid from "./workTracker/CalendarGrid";
 import ConfigPanel from "./workTracker/ConfigPanel";
 import FilePickerScreen from "./workTracker/FilePickerScreen";
@@ -82,83 +86,76 @@ export default function WorkTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-8 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-background px-4 py-8 text-foreground">
       <div className="mx-auto w-full max-w-[1700px]">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Work Hours Tracker
           </h1>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => moveMonth("prev")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-500"
-            >
+            <Button variant="outline" size="sm" onClick={() => moveMonth("prev")}>
               Prev
-            </button>
-            <input
-              className="min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none ring-cyan-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            </Button>
+            <Input
+              className="h-9 w-auto min-w-0"
               type="month"
               value={monthKey}
               onChange={(event) => handleMonthChange(event.target.value)}
             />
-            <button
-              type="button"
-              onClick={() => moveMonth("next")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-500"
-            >
+            <Button variant="outline" size="sm" onClick={() => moveMonth("next")}>
               Next
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center gap-2">
             <ThemeToggle theme={theme} onThemeChange={setTheme} />
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
               onClick={() => setShowConfig(!showConfig)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-500 dark:hover:text-cyan-300"
             >
+              <Settings2 />
               {showConfig ? "Hide settings" : "Show settings"}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {showConfig ? (
-          <ConfigPanel
-            savedMonthsCount={savedMonths.length}
-            lastSavedAt={lastSavedAt}
-            onClose={() => setShowConfig(false)}
-            selectedDays={selectedDays}
-            onToggleDay={toggleDay}
-            hoursPerDay={hoursPerDay}
-            onHoursPerDayChange={onHoursPerDayChange}
-            hourlyRate={hourlyRate}
-            onHourlyRateChange={onHourlyRateChange}
-            currency={currency}
-            onCurrencyChange={onCurrencyChange}
-            secondaryCurrency={secondaryCurrency}
-            onSecondaryCurrencyChange={onSecondaryCurrencyChange}
-            conversionRate={conversionRate}
-            onConversionRateChange={onConversionRateChange}
-            taxPercent={taxPercent}
-            onTaxPercentChange={onTaxPercentChange}
-            extraDeduction={extraDeduction}
-            onExtraDeductionChange={onExtraDeductionChange}
-            payslipStartDay={payslipStartDay}
-            onPayslipStartDayChange={onPayslipStartDayChange}
-            defaultHours={defaultHours}
-            onDefaultHoursChange={onDefaultHoursChange}
-            recentActivity={recentActivity}
-            onExportData={exportData}
-            onImportData={importData}
-            isFileMode={isFileMode}
-            filePath={filePath}
-            onChangeFile={changeFile}
-          />
-        ) : null}
+        <ConfigPanel
+          open={showConfig}
+          savedMonthsCount={savedMonths.length}
+          lastSavedAt={lastSavedAt}
+          onClose={() => setShowConfig(false)}
+          selectedDays={selectedDays}
+          onToggleDay={toggleDay}
+          hoursPerDay={hoursPerDay}
+          onHoursPerDayChange={onHoursPerDayChange}
+          hourlyRate={hourlyRate}
+          onHourlyRateChange={onHourlyRateChange}
+          currency={currency}
+          onCurrencyChange={onCurrencyChange}
+          secondaryCurrency={secondaryCurrency}
+          onSecondaryCurrencyChange={onSecondaryCurrencyChange}
+          conversionRate={conversionRate}
+          onConversionRateChange={onConversionRateChange}
+          taxPercent={taxPercent}
+          onTaxPercentChange={onTaxPercentChange}
+          extraDeduction={extraDeduction}
+          onExtraDeductionChange={onExtraDeductionChange}
+          payslipStartDay={payslipStartDay}
+          onPayslipStartDayChange={onPayslipStartDayChange}
+          defaultHours={defaultHours}
+          onDefaultHoursChange={onDefaultHoursChange}
+          recentActivity={recentActivity}
+          onExportData={exportData}
+          onImportData={importData}
+          isFileMode={isFileMode}
+          filePath={filePath}
+          onChangeFile={changeFile}
+        />
 
-        <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+        <Card className="bg-card/70 p-6 shadow-xl backdrop-blur">
           <StatsBar
             workingDaysCount={exceptionSummary.workingDaysCount}
             vacationDays={exceptionSummary.vacationDays}
@@ -189,7 +186,7 @@ export default function WorkTracker() {
             onHoursChange={updateDayHours}
             onExtraHoursChange={updateExtraHours}
           />
-        </section>
+        </Card>
 
         <YearlyOverview
           graphYear={graphYear}
