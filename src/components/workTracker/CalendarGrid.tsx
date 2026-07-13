@@ -1,5 +1,22 @@
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { EllipsisVertical } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { calendarHeaders, ExceptionType } from "./types";
 import { dateKey } from "./utils";
 
@@ -24,13 +41,6 @@ interface CalendarGridProps {
   onExtraHoursChange: (key: string, value: number) => void;
 }
 
-interface MenuState {
-  key: string;
-  hasException: boolean;
-  x: number;
-  y: number;
-}
-
 export default function CalendarGrid({
   cells,
   payslipDateLookup,
@@ -45,46 +55,19 @@ export default function CalendarGrid({
   onHoursChange,
   onExtraHoursChange,
 }: CalendarGridProps) {
-  const [menu, setMenu] = useState<MenuState | null>(null);
-
-  useEffect(() => {
-    if (!menu) return;
-    const closeMenu = () => setMenu(null);
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenu(null);
-      }
-    };
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [menu]);
-
-  const openMenuAt = (
-    key: string,
-    hasException: boolean,
-    x: number,
-    y: number,
-  ) => {
-    setMenu({ key, hasException, x, y });
-  };
-
   return (
     <>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {selectedMonthInfo.label}
         </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
+        <p className="text-xs text-muted-foreground">
           <span aria-hidden="true">⋮</span> or right-click a workday to mark
           vacation/sick
         </p>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 border-b border-slate-200 pb-2 text-center text-xs font-medium uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <div className="grid grid-cols-7 gap-2 border-b pb-2 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {calendarHeaders.map((header) => (
           <div key={header}>{header}</div>
         ))}
@@ -96,7 +79,7 @@ export default function CalendarGrid({
             return (
               <div
                 key={`empty-${index}`}
-                className="h-20 rounded-lg border border-transparent bg-slate-200/30 dark:bg-slate-950/30"
+                className="h-20 rounded-lg border border-transparent bg-muted/30"
               />
             );
           }
@@ -121,71 +104,80 @@ export default function CalendarGrid({
 
           const backgroundClass = exceptionType
             ? exceptionType === "vacation"
-              ? "border-amber-300/80 bg-amber-400/20"
-              : "border-rose-300/80 bg-rose-400/20"
+              ? "border-amber-300/80 bg-amber-400/20 dark:border-amber-400/60"
+              : "border-rose-300/80 bg-rose-400/20 dark:border-rose-400/60"
             : isWorkingDay
-              ? "border-cyan-400/70 bg-cyan-500/20"
+              ? "border-primary/60 bg-primary/15"
               : canLogExtraHours && extraHoursForDay > 0
-                ? "border-violet-300/80 bg-violet-400/20"
+                ? "border-violet-300/80 bg-violet-400/20 dark:border-violet-400/60"
                 : inPayslipRange
-                  ? "border-slate-300 bg-slate-200/80 dark:border-slate-600 dark:bg-slate-800/80"
-                  : "border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/70";
+                  ? "border-muted-foreground/30 bg-muted/70"
+                  : "border-border bg-muted/30";
 
-          return (
+          const dayCell = (
             <div
-              key={key}
-              onContextMenu={
-                isWorkingDay
-                  ? (event) => {
-                      event.preventDefault();
-                      openMenuAt(
-                        key,
-                        !!exceptionType,
-                        event.clientX,
-                        event.clientY,
-                      );
-                    }
-                  : undefined
-              }
-              className={`h-20 rounded-lg border p-2 text-left transition ${backgroundClass} ${
-                isToday ? "ring-2 ring-amber-400/80" : ""
-              } ${!isInSelectedMonth ? "opacity-80" : ""}`}
+              className={cn(
+                "h-20 rounded-lg border p-2 text-left transition",
+                backgroundClass,
+                isToday && "ring-2 ring-amber-400/80",
+                !isInSelectedMonth && "opacity-80",
+              )}
             >
               <div className="flex items-center justify-between gap-1">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                <p className="text-sm font-medium text-foreground">
                   {cell.getDate()}
                 </p>
                 <div className="flex items-center gap-1">
                   {!isInSelectedMonth ? (
-                    <span className="rounded border border-slate-300 bg-white/80 px-1.5 py-0.5 text-[10px] uppercase text-slate-600 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300">
+                    <Badge
+                      variant="outline"
+                      className="bg-card/80 px-1.5 py-0 text-[10px] font-normal uppercase text-muted-foreground"
+                    >
                       {monthTag}
-                    </span>
+                    </Badge>
                   ) : null}
                   {isWorkingDay ? (
-                    <button
-                      type="button"
-                      aria-label={`Mark vacation or sick for ${cell.toDateString()}`}
-                      aria-haspopup="menu"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        const rect =
-                          event.currentTarget.getBoundingClientRect();
-                        openMenuAt(
-                          key,
-                          !!exceptionType,
-                          rect.left,
-                          rect.bottom + 4,
-                        );
-                      }}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-300/60 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700/60 dark:hover:text-slate-200"
-                    >
-                      <span aria-hidden="true">⋮</span>
-                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Mark vacation or sick for ${cell.toDateString()}`}
+                          className="h-4 w-4 shrink-0 rounded text-muted-foreground hover:text-foreground [&_svg]:size-3"
+                        >
+                          <EllipsisVertical />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                          className="text-amber-700 focus:text-amber-700 dark:text-amber-300 dark:focus:text-amber-200"
+                          onSelect={() => onSetException(key, "vacation")}
+                        >
+                          Mark vacation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-200"
+                          onSelect={() => onSetException(key, "sick")}
+                        >
+                          Mark sick
+                        </DropdownMenuItem>
+                        {exceptionType ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() => onSetException(key, "none")}
+                            >
+                              Clear mark
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   ) : null}
                 </div>
               </div>
 
-              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-[10px] text-muted-foreground">
                 {exceptionType === "vacation"
                   ? "Vacation"
                   : exceptionType === "sick"
@@ -200,8 +192,8 @@ export default function CalendarGrid({
               </p>
 
               {isWorkingDay ? (
-                <input
-                  className="mt-1 w-full rounded border border-slate-300 bg-white/70 px-1.5 py-0.5 text-[10px] text-slate-800 outline-none ring-cyan-500 focus:ring-1 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100"
+                <Input
+                  className="mt-1 h-6 rounded border-input/80 bg-card/70 px-1.5 py-0.5 text-[10px] md:text-[10px]"
                   type="number"
                   min={0}
                   max={24}
@@ -213,8 +205,8 @@ export default function CalendarGrid({
                   }
                 />
               ) : canLogExtraHours ? (
-                <input
-                  className="mt-1 w-full rounded border border-violet-300 bg-white/70 px-1.5 py-0.5 text-[10px] text-slate-800 outline-none ring-violet-500 placeholder:text-slate-400 focus:ring-1 dark:border-violet-700 dark:bg-slate-950/70 dark:text-slate-100"
+                <Input
+                  className="mt-1 h-6 rounded border-violet-300 bg-card/70 px-1.5 py-0.5 text-[10px] focus-visible:ring-violet-500 md:text-[10px] dark:border-violet-700"
                   type="number"
                   min={0}
                   max={24}
@@ -229,56 +221,40 @@ export default function CalendarGrid({
               ) : null}
             </div>
           );
+
+          if (!isWorkingDay) {
+            return <div key={key}>{dayCell}</div>;
+          }
+
+          return (
+            <ContextMenu key={key}>
+              <ContextMenuTrigger asChild>{dayCell}</ContextMenuTrigger>
+              <ContextMenuContent className="w-40">
+                <ContextMenuItem
+                  className="text-amber-700 focus:text-amber-700 dark:text-amber-300 dark:focus:text-amber-200"
+                  onSelect={() => onSetException(key, "vacation")}
+                >
+                  Mark vacation
+                </ContextMenuItem>
+                <ContextMenuItem
+                  className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-200"
+                  onSelect={() => onSetException(key, "sick")}
+                >
+                  Mark sick
+                </ContextMenuItem>
+                {exceptionType ? (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onSelect={() => onSetException(key, "none")}>
+                      Clear mark
+                    </ContextMenuItem>
+                  </>
+                ) : null}
+              </ContextMenuContent>
+            </ContextMenu>
+          );
         })}
       </div>
-
-      {menu
-        ? createPortal(
-            <div
-              role="menu"
-              className="fixed z-50 w-40 overflow-hidden rounded-lg border border-slate-300 bg-white text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
-              style={{ left: menu.x, top: menu.y }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onSetException(menu.key, "vacation");
-                  setMenu(null);
-                }}
-                className="block w-full px-3 py-2 text-left text-amber-700 hover:bg-amber-400/10 dark:text-amber-200"
-              >
-                Mark vacation
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onSetException(menu.key, "sick");
-                  setMenu(null);
-                }}
-                className="block w-full px-3 py-2 text-left text-rose-700 hover:bg-rose-400/10 dark:text-rose-200"
-              >
-                Mark sick
-              </button>
-              {menu.hasException ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onSetException(menu.key, "none");
-                    setMenu(null);
-                  }}
-                  className="block w-full border-t border-slate-200 px-3 py-2 text-left text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                >
-                  Clear mark
-                </button>
-              ) : null}
-            </div>,
-            document.body,
-          )
-        : null}
     </>
   );
 }
