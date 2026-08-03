@@ -30,7 +30,13 @@ marketing page, or jump straight into the
 
 ## Install
 
-Download the latest release for your platform from the
+**macOS (Apple Silicon)** — via Homebrew:
+
+```bash
+brew install --cask quackbyte/tap/punchboard
+```
+
+Or download the latest release for your platform from the
 [Releases page](https://github.com/QuackByte/punchboard/releases):
 
 - **macOS** — `.dmg` or `.zip` (signed and notarized)
