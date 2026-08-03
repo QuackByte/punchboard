@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.3.0...work-hours-tracker-v1.4.0) (2026-08-03)
+
+
+### Features
+
+* enter hours as durations or time ranges, show weekly totals ([#19](https://github.com/jsanzdev/work-hours-tracker/issues/19)) ([0b23a48](https://github.com/jsanzdev/work-hours-tracker/commit/0b23a489d45afa1be2cc37c752579164be0fb414))
+
 ## [1.3.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.2.0...work-hours-tracker-v1.3.0) (2026-08-03)
 
 
