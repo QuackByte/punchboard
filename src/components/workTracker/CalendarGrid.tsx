@@ -143,7 +143,7 @@ export default function CalendarGrid({
                           variant="ghost"
                           size="icon"
                           aria-label={`Mark vacation or sick for ${cell.toDateString()}`}
-                          className="h-4 w-4 shrink-0 rounded text-muted-foreground hover:text-foreground [&_svg]:size-3"
+                          className="h-6 w-6 shrink-0 rounded text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-3.5"
                         >
                           <EllipsisVertical />
                         </Button>
@@ -193,7 +193,12 @@ export default function CalendarGrid({
 
               {isWorkingDay ? (
                 <Input
-                  className="mt-1 h-6 rounded border-input/80 bg-card/70 px-1.5 py-0.5 text-[10px] md:text-[10px]"
+                  className={cn(
+                    "mt-1 h-6 rounded border-transparent bg-transparent px-1.5 py-0.5 text-[10px] transition-colors [appearance:textfield] hover:border-input/80 hover:bg-card/70 focus-visible:border-input/80 focus-visible:bg-card/70 focus-visible:ring-1 focus-visible:ring-offset-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none md:text-[10px]",
+                    hoursForDay === hoursPerDay
+                      ? "text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                      : "font-semibold text-foreground",
+                  )}
                   type="number"
                   min={0}
                   max={24}
@@ -206,7 +211,7 @@ export default function CalendarGrid({
                 />
               ) : canLogExtraHours ? (
                 <Input
-                  className="mt-1 h-6 rounded border-violet-300 bg-card/70 px-1.5 py-0.5 text-[10px] focus-visible:ring-violet-500 md:text-[10px] dark:border-violet-700"
+                  className="mt-1 h-6 rounded border-violet-300 bg-card/70 px-1.5 py-0.5 text-[10px] [appearance:textfield] focus-visible:ring-1 focus-visible:ring-violet-500 focus-visible:ring-offset-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none md:text-[10px] dark:border-violet-700"
                   type="number"
                   min={0}
                   max={24}

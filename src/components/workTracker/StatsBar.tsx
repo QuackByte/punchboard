@@ -18,6 +18,8 @@ interface StatsBarProps {
   netSalary: number;
   convertedGrossSalary: number;
   convertedNetSalary: number;
+  convertedTaxAmount: number;
+  convertedExtraDeductionAmount: number;
 }
 
 function StatCard({
@@ -26,21 +28,35 @@ function StatCard({
   sub,
   accentClass,
   spanClass = "",
+  emphasize = false,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   accentClass: string;
   spanClass?: string;
+  emphasize?: boolean;
 }) {
   return (
     <Card
-      className={cn("border-l-4 bg-card/70 p-3 shadow-none", accentClass, spanClass)}
+      className={cn(
+        "border-l-4 bg-card p-3 shadow-sm",
+        emphasize && "bg-emerald-500/10 dark:bg-emerald-500/10",
+        accentClass,
+        spanClass,
+      )}
     >
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+      <p
+        className={cn(
+          "mt-1 font-semibold text-foreground",
+          emphasize ? "text-2xl" : "text-xl",
+        )}
+      >
+        {value}
+      </p>
       {sub}
     </Card>
   );
@@ -61,6 +77,8 @@ export default function StatsBar({
   netSalary,
   convertedGrossSalary,
   convertedNetSalary,
+  convertedTaxAmount,
+  convertedExtraDeductionAmount,
 }: StatsBarProps) {
   const symbol = getCurrencySymbol(currency);
   const secondarySymbol = getCurrencySymbol(secondaryCurrency);
@@ -136,18 +154,35 @@ export default function StatsBar({
             value={`${symbol}${taxAmount.toFixed(2)}`}
             accentClass="border-l-orange-400 dark:border-l-orange-500"
             spanClass="lg:col-span-3"
+            sub={
+              showConversion ? (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  ≈ {secondarySymbol}
+                  {convertedTaxAmount.toFixed(2)}
+                </p>
+              ) : undefined
+            }
           />
           <StatCard
             label="Deductions"
             value={`${symbol}${extraDeductionAmount.toFixed(2)}`}
-            accentClass="border-l-violet-400 dark:border-l-violet-500"
+            accentClass="border-l-rose-400 dark:border-l-rose-500"
             spanClass="lg:col-span-3"
+            sub={
+              showConversion ? (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  ≈ {secondarySymbol}
+                  {convertedExtraDeductionAmount.toFixed(2)}
+                </p>
+              ) : undefined
+            }
           />
           <StatCard
             label="Net pay"
             value={`${symbol}${netSalary.toFixed(2)}`}
             accentClass="border-l-emerald-400 dark:border-l-emerald-500"
             spanClass="lg:col-span-3"
+            emphasize
             sub={
               showConversion ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">
