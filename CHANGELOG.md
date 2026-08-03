@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.2.0...work-hours-tracker-v1.3.0) (2026-08-03)
+
+
+### Features
+
+* migrate UI to shadcn/ui components ([0e77e65](https://github.com/jsanzdev/work-hours-tracker/commit/0e77e65482c70dbd0e7f0c8fff2e02b47f803474))
+* migrate UI to shadcn/ui components ([e5d617d](https://github.com/jsanzdev/work-hours-tracker/commit/e5d617d2d4ab3afc8fedc959e1dc9cad966ac5c5))
+* show currency conversion for tax/deductions and polish UI ([542aaff](https://github.com/jsanzdev/work-hours-tracker/commit/542aafff56356e94c0ad16ae86a6f441c5ff9a23))
+
 ## [1.2.0](https://github.com/jsanzdev/work-hours-tracker/compare/work-hours-tracker-v1.1.4...work-hours-tracker-v1.2.0) (2026-07-01)
 
 
