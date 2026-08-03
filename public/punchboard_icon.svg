@@ -1,0 +1,26 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" role="img" xmlns="http://www.w3.org/2000/svg">
+ <title>Punchboard app icon</title>
+ <desc>A punch card with three ascending punched holes, representing tracked hours trending up.</desc>
+
+ <defs>
+  <linearGradient id="bgGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1024">
+   <stop offset="0%" stop-color="#22d3ee"/>
+   <stop offset="100%" stop-color="#0891b2"/>
+  </linearGradient>
+  <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+   <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#043b4a" flood-opacity="0.35"/>
+  </filter>
+ </defs>
+
+ <rect x="0" y="0" width="1024" height="1024" rx="229" fill="url(#bgGrad)"/>
+
+ <rect x="332" y="232" width="360" height="560" rx="56" fill="#ffffff" filter="url(#cardShadow)"/>
+
+ <!-- ticket notch -->
+ <circle cx="512" cy="232" r="26" fill="url(#bgGrad)"/>
+
+ <!-- punched holes, ascending left to right -->
+ <circle cx="420" cy="680" r="34" fill="url(#bgGrad)"/>
+ <circle cx="512" cy="560" r="40" fill="url(#bgGrad)"/>
+ <circle cx="604" cy="440" r="46" fill="url(#bgGrad)"/>
+</svg>

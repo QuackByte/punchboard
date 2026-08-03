@@ -1,8 +1,16 @@
 {
-  "name": "work-hours-tracker",
+  "name": "punchboard",
   "description": "Desktop app to track daily work hours",
   "private": true,
   "version": "1.4.0",
+  "license": "MIT",
+  "author": "Jesus Sanz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jsanzdev/punchboard.git"
+  },
+  "homepage": "https://github.com/jsanzdev/punchboard",
+  "bugs": "https://github.com/jsanzdev/punchboard/issues",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
@@ -16,13 +24,13 @@
     "dist": "npm run build && electron-builder"
   },
   "build": {
-    "appId": "com.workhourstracker.desktop",
-    "productName": "Work Hours Tracker",
+    "appId": "com.punchboard.desktop",
+    "productName": "Punchboard",
     "publish": [
       {
         "provider": "github",
         "owner": "jsanzdev",
-        "repo": "work-hours-tracker"
+        "repo": "punchboard"
       }
     ],
     "files": [
@@ -34,7 +42,7 @@
     ],
     "afterPack": "build-resources/afterPack.cjs",
     "mac": {
-      "icon": "public/WorkHoursTracker.icns",
+      "icon": "public/Punchboard.icns",
       "target": [
         "dmg",
         "zip"
@@ -46,11 +54,13 @@
       "notarize": true
     },
     "win": {
+      "icon": "public/icon_1024x1024.png",
       "target": [
         "nsis"
       ]
     },
     "linux": {
+      "icon": "public/icon_1024x1024.png",
       "target": [
         "AppImage"
       ],
