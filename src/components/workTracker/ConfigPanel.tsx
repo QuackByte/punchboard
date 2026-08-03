@@ -352,22 +352,23 @@ export default function ConfigPanel({
               />
             </div>
 
-            <div className="mt-3 space-y-2">
-              <Label htmlFor="conversion-rate">
-                Conversion rate ({currency} → {secondaryCurrency})
-              </Label>
-              <Input
-                id="conversion-rate"
-                type="number"
-                min={0}
-                step={0.0001}
-                disabled={currency === secondaryCurrency}
-                value={conversionRate}
-                onChange={(event) =>
-                  onConversionRateChange(Number(event.target.value))
-                }
-              />
-            </div>
+            {currency !== secondaryCurrency ? (
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="conversion-rate">
+                  Conversion rate ({currency} → {secondaryCurrency})
+                </Label>
+                <Input
+                  id="conversion-rate"
+                  type="number"
+                  min={0}
+                  step={0.0001}
+                  value={conversionRate}
+                  onChange={(event) =>
+                    onConversionRateChange(Number(event.target.value))
+                  }
+                />
+              </div>
+            ) : null}
           </div>
         </Section>
 

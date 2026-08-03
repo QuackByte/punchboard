@@ -57,6 +57,8 @@ export default function WorkTracker() {
     netSalary,
     convertedGrossSalary,
     convertedNetSalary,
+    convertedTaxAmount,
+    convertedExtraDeductionAmount,
     payslipDateLookup,
     workingDateLookup,
     setDayException,
@@ -98,7 +100,7 @@ export default function WorkTracker() {
               Prev
             </Button>
             <Input
-              className="h-9 w-auto min-w-0"
+              className="h-9 w-auto min-w-0 [color-scheme:light] dark:[color-scheme:dark]"
               type="month"
               value={monthKey}
               onChange={(event) => handleMonthChange(event.target.value)}
@@ -171,6 +173,8 @@ export default function WorkTracker() {
             netSalary={netSalary}
             convertedGrossSalary={convertedGrossSalary}
             convertedNetSalary={convertedNetSalary}
+            convertedTaxAmount={convertedTaxAmount}
+            convertedExtraDeductionAmount={convertedExtraDeductionAmount}
           />
           <CalendarGrid
             cells={calendarCells}

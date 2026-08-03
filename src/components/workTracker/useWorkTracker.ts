@@ -779,6 +779,8 @@ export function useWorkTracker() {
   const netSalary = Math.max(0, grossSalary - taxAmount - extraDeductionAmount);
   const convertedGrossSalary = grossSalary * conversionRate;
   const convertedNetSalary = netSalary * conversionRate;
+  const convertedTaxAmount = taxAmount * conversionRate;
+  const convertedExtraDeductionAmount = extraDeductionAmount * conversionRate;
 
   const setDayException = (key: string, type: ExceptionType | "none") => {
     if (!workingDateLookup.has(key)) {
@@ -1033,6 +1035,8 @@ export function useWorkTracker() {
     netSalary,
     convertedGrossSalary,
     convertedNetSalary,
+    convertedTaxAmount,
+    convertedExtraDeductionAmount,
     payslipDateLookup,
     workingDateLookup,
     setDayException,
