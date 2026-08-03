@@ -2,7 +2,7 @@
   "name": "work-hours-tracker",
   "description": "Desktop app to track daily work hours",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
