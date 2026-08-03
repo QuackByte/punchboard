@@ -50,6 +50,7 @@ export default function WorkTracker() {
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,
+    dailyActualHours,
     estimatedHours,
     grossSalary,
     taxAmount,
@@ -184,6 +185,7 @@ export default function WorkTracker() {
             exceptions={exceptions}
             dailyHours={dailyHours}
             extraHours={extraHours}
+            dailyActualHours={dailyActualHours}
             hoursPerDay={hoursPerDay}
             today={today}
             onSetException={setDayException}

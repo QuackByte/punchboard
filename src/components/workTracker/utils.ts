@@ -150,3 +150,86 @@ export function clampPercent(percent: number) {
   }
   return Math.min(100, Math.max(0, percent));
 }
+
+const TIME_RANGE_REGEX =
+  /^(\d{1,2})(?::(\d{2}))?\s*(?:-|to|–|—)\s*(\d{1,2})(?::(\d{2}))?$/i;
+const DURATION_REGEX =
+  /^(?:(\d{1,2}(?:\.\d+)?)\s*h)?\s*(?:(\d{1,2})\s*m)?$/i;
+
+/**
+ * Parses hours entered as a plain decimal ("7.5"), a duration ("9h 40m",
+ * "9h", "40m"), or a time range ("08:30 to 18:45", "08:30-18:45"). Returns
+ * null when the text doesn't match any of these shapes.
+ */
+export function parseHoursInput(rawInput: string): number | null {
+  const input = rawInput.trim();
+  if (!input) {
+    return null;
+  }
+
+  const rangeMatch = input.match(TIME_RANGE_REGEX);
+  if (rangeMatch) {
+    const startHour = Number(rangeMatch[1]);
+    const startMinute = Number(rangeMatch[2] ?? 0);
+    const endHour = Number(rangeMatch[3]);
+    const endMinute = Number(rangeMatch[4] ?? 0);
+
+    if (
+      startHour > 23 ||
+      endHour > 23 ||
+      startMinute > 59 ||
+      endMinute > 59
+    ) {
+      return null;
+    }
+
+    const diffMinutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+    if (diffMinutes <= 0) {
+      return null;
+    }
+
+    return diffMinutes / 60;
+  }
+
+  const durationMatch = input.match(DURATION_REGEX);
+  if (
+    durationMatch &&
+    (durationMatch[1] !== undefined || durationMatch[2] !== undefined)
+  ) {
+    const hoursPart = Number(durationMatch[1] ?? 0);
+    const minutesPart = Number(durationMatch[2] ?? 0);
+    if (minutesPart > 59) {
+      return null;
+    }
+    return hoursPart + minutesPart / 60;
+  }
+
+  const plainNumber = Number(input);
+  if (Number.isFinite(plainNumber)) {
+    return plainNumber;
+  }
+
+  return null;
+}
+
+/** Formats hours as a duration string, e.g. 9.5 -> "09h 30m", 8 -> "08h". */
+export function formatDuration(hours: number) {
+  const totalMinutes = Math.round(Math.max(0, hours) * 60);
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hoursLabel = `${String(wholeHours).padStart(2, "0")}h`;
+
+  if (minutes === 0) {
+    return hoursLabel;
+  }
+
+  return `${hoursLabel} ${String(minutes).padStart(2, "0")}m`;
+}
+
+/** Same as formatDuration, but returns "" for zero/blank values. */
+export function formatDurationOrBlank(hours: number) {
+  if (!hours || hours <= 0) {
+    return "";
+  }
+  return formatDuration(hours);
+}
