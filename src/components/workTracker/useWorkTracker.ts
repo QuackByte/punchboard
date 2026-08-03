@@ -772,6 +772,45 @@ export function useWorkTracker() {
     ],
   );
 
+  const dailyActualHours = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    workingDates.forEach((date) => {
+      const key = dateKey(date);
+      if (exceptions[key] === "sick") {
+        map[key] = 0;
+        return;
+      }
+      if (exceptions[key] === "vacation") {
+        const manualHours = dailyHours[key] ?? 0;
+        map[key] = defaultHours + clampHours(manualHours);
+        return;
+      }
+      map[key] = clampHours(dailyHours[key] ?? hoursPerDay);
+    });
+
+    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
+    rangeDates.forEach((date) => {
+      const key = dateKey(date);
+      if (workingDateLookup.has(key)) {
+        return;
+      }
+      map[key] = clampHours(extraHours[key] ?? 0);
+    });
+
+    return map;
+  }, [
+    workingDates,
+    exceptions,
+    dailyHours,
+    hoursPerDay,
+    defaultHours,
+    monthKey,
+    payslipStartDay,
+    workingDateLookup,
+    extraHours,
+  ]);
+
   const estimatedHours = workingDates.length * hoursPerDay;
   const grossSalary = actualHours * hourlyRate;
   const taxAmount = grossSalary * (clampPercent(taxPercent) / 100);
@@ -1028,6 +1067,7 @@ export function useWorkTracker() {
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,
+    dailyActualHours,
     estimatedHours,
     grossSalary,
     taxAmount,

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { CurrencyCode, getCurrencySymbol } from "./types";
+import { formatDuration } from "./utils";
 
 interface StatsBarProps {
   workingDaysCount: number;
@@ -111,19 +112,19 @@ export default function StatsBar({
           />
           <StatCard
             label="Actual hours"
-            value={actualHours}
+            value={formatDuration(actualHours)}
             accentClass="border-l-slate-300 dark:border-l-slate-600"
             spanClass="lg:col-span-2"
           />
           <StatCard
             label="Estimated hours"
-            value={estimatedHours}
+            value={formatDuration(estimatedHours)}
             accentClass="border-l-slate-300 dark:border-l-slate-600"
             spanClass="lg:col-span-2"
           />
           <StatCard
             label="Extra hours"
-            value={extraHoursTotal}
+            value={formatDuration(extraHoursTotal)}
             accentClass="border-l-indigo-400 dark:border-l-indigo-500"
             spanClass="lg:col-span-2"
           />
