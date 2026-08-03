@@ -6,9 +6,9 @@ eye on your yearly workload — for macOS, Windows, and Linux.
 Your data stays in a plain JSON file that you choose the location of, so it's
 easy to sync with iCloud, Dropbox, or any folder you already back up.
 
-**[jsanzdev.github.io/punchboard](https://jsanzdev.github.io/punchboard/)** —
+**[quackbyte.dev/punchboard](https://quackbyte.dev/punchboard/)** —
 marketing page, or jump straight into the
-[browser app](https://jsanzdev.github.io/punchboard/app/).
+[browser app](https://quackbyte.dev/punchboard/app/).
 
 ## Features
 
@@ -31,7 +31,7 @@ marketing page, or jump straight into the
 ## Install
 
 Download the latest release for your platform from the
-[Releases page](https://github.com/jsanzdev/punchboard/releases):
+[Releases page](https://github.com/QuackByte/punchboard/releases):
 
 - **macOS** — `.dmg` or `.zip` (signed and notarized)
 - **Windows** — `.exe` (NSIS installer)

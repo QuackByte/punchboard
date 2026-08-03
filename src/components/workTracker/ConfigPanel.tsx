@@ -458,7 +458,17 @@ export default function ConfigPanel({
           <p className="text-xs text-muted-foreground">
             Punchboard v{__APP_VERSION__}
             <br />
-            &copy; {new Date().getFullYear()} Jesus Sanz &middot; MIT License
+            Made by{" "}
+            <a
+              href="https://quackbyte.dev"
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-foreground"
+            >
+              QuackByte
+            </a>
+            <br />
+            &copy; {new Date().getFullYear()} &middot; MIT License
           </p>
         </Section>
       </SheetContent>

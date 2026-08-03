@@ -1,4 +1,4 @@
-const REPO = "jsanzdev/punchboard";
+const REPO = "QuackByte/punchboard";
 const FALLBACK_URL = `https://github.com/${REPO}/releases/latest`;
 
 async function loadReleaseLinks() {

@@ -4,13 +4,13 @@
   "private": true,
   "version": "1.6.0",
   "license": "MIT",
-  "author": "Jesus Sanz",
+  "author": "QuackByte (https://quackbyte.dev)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jsanzdev/punchboard.git"
+    "url": "https://github.com/QuackByte/punchboard.git"
   },
-  "homepage": "https://github.com/jsanzdev/punchboard",
-  "bugs": "https://github.com/jsanzdev/punchboard/issues",
+  "homepage": "https://github.com/QuackByte/punchboard",
+  "bugs": "https://github.com/QuackByte/punchboard/issues",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
@@ -29,7 +29,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "jsanzdev",
+        "owner": "QuackByte",
         "repo": "punchboard"
       }
     ],
