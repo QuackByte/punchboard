@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/jsanzdev/punchboard/compare/punchboard-v1.5.0...punchboard-v1.6.0) (2026-08-03)
+
+
+### Features
+
+* add currency conversion toggle, manual update check, and app branding touches ([992ab8b](https://github.com/jsanzdev/punchboard/commit/992ab8b6fa9cd5f20cf8f14c7ce0b35e1d3ea370))
+
 ## [1.5.0](https://github.com/jsanzdev/punchboard/compare/punchboard-v1.4.0...punchboard-v1.5.0) (2026-08-03)
 
 
