@@ -71,7 +71,7 @@ function registerFileIpcHandlers() {
   ipcMain.handle("file:save-dialog", async () => {
     const result = await dialog.showSaveDialog({
       title: "Create new data file",
-      defaultPath: "work-hours-tracker.json",
+      defaultPath: "punchboard.json",
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
     return result.canceled || !result.filePath ? null : result.filePath;
@@ -112,8 +112,8 @@ function loadAppIcon(iconPath: string) {
 
 function getAppIconPath() {
   return app.isPackaged
-    ? path.join(__dirname, "../public/work_hours_tracker_icon.svg")
-    : path.join(process.cwd(), "public/work_hours_tracker_icon.svg");
+    ? path.join(__dirname, "../public/punchboard_icon.svg")
+    : path.join(process.cwd(), "public/punchboard_icon.svg");
 }
 
 function createMainWindow() {
@@ -126,7 +126,7 @@ function createMainWindow() {
     minWidth: 1080,
     minHeight: 720,
     backgroundColor: "#e2e8f0",
-    title: "Work Hours Tracker",
+    title: "Punchboard",
     icon: iconImage,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),

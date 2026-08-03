@@ -93,7 +93,7 @@ export default function WorkTracker() {
       <div className="mx-auto w-full max-w-[1700px]">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Work Hours Tracker
+            Punchboard
           </h1>
 
           <div className="flex items-center gap-2">

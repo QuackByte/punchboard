@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Punchboard — track hours, estimate pay</title>
+  <meta name="description" content="A free, open-source desktop and web app for tracking daily work hours, vacation and sick days, and estimating gross/net pay. Your data stays in a file you control." />
+  <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="./">
+        <img class="brand__mark" src="./assets/logo.svg" alt="" width="32" height="32" />
+        <span class="brand__name">Punchboard</span>
+      </a>
+      <nav class="site-nav">
+        <a href="#features">Features</a>
+        <a href="#downloads">Download</a>
+        <a href="https://github.com/jsanzdev/punchboard" target="_blank" rel="noopener">GitHub</a>
+        <a class="button button--primary" href="./app/">Open the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero__inner">
+        <div class="hero__copy">
+          <p class="eyebrow">Free &amp; open source · MIT licensed</p>
+          <h1>Track your hours.<br />Know your pay.</h1>
+          <p class="hero__subtitle">
+            Punchboard logs daily work hours on a calendar, tracks vacation and
+            sick days, and estimates your gross and net pay — with tax,
+            deductions, and currency conversion built in. Your data lives in a
+            plain file you choose, not someone else's server.
+          </p>
+          <div class="hero__actions">
+            <a class="button button--primary button--large" href="./app/">Open the app</a>
+            <a class="button button--ghost button--large" href="#downloads">Download for desktop</a>
+          </div>
+        </div>
+        <div class="hero__mockup" aria-hidden="true">
+          <div class="mock-window">
+            <div class="mock-window__bar">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="mock-stats">
+              <div class="mock-stat mock-stat--cyan">
+                <div class="mock-stat__label">Working days</div>
+                <div class="mock-stat__value">23</div>
+              </div>
+              <div class="mock-stat mock-stat--amber">
+                <div class="mock-stat__label">Vacation</div>
+                <div class="mock-stat__value">2</div>
+              </div>
+              <div class="mock-stat mock-stat--green">
+                <div class="mock-stat__label">Net pay</div>
+                <div class="mock-stat__value">£2760</div>
+              </div>
+            </div>
+            <div class="mock-grid">
+              <div class="mock-day"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day mock-day--off"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day mock-day--off"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day mock-day--vacation"></div>
+              <div class="mock-day"></div>
+              <div class="mock-day mock-day--off"></div>
+              <div class="mock-day mock-day--off"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <div class="container">
+        <h2>Everything you need to track a work week</h2>
+        <div class="features__grid">
+          <div class="feature-card">
+            <h3>Calendar-based tracking</h3>
+            <p>Log hours per day as a duration or a time range, right from a monthly grid.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Day exceptions</h3>
+            <p>Mark vacation, sick leave, or holidays — excluded automatically from expected hours.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Extra hours</h3>
+            <p>Track overtime separately from your regular schedule.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Salary estimation</h3>
+            <p>Set an hourly rate, tax percentage, and deductions to see estimated gross and net pay.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Currency conversion</h3>
+            <p>Show a second currency alongside your primary one, using a manual conversion rate.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Yearly overview</h3>
+            <p>A chart of hours worked per month, plus weekly totals in the calendar view.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Import / export</h3>
+            <p>Back up or move your data as a plain JSON file, any time.</p>
+          </div>
+          <div class="feature-card">
+            <h3>Your data, your file</h3>
+            <p>No account, no server. Store your data anywhere — iCloud, Dropbox, or a local folder.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="downloads" class="downloads">
+      <div class="container">
+        <h2>Download for your desktop</h2>
+        <p class="downloads__subtitle">
+          Free and open source. Installed apps check for updates automatically.
+          Current version: <strong data-version>—</strong>
+        </p>
+        <div class="downloads__grid">
+          <a class="download-card" data-platform-card="mac" data-download="mac" href="https://github.com/jsanzdev/punchboard/releases/latest" target="_blank" rel="noopener">
+            <h3>macOS</h3>
+            <p>Signed &amp; notarized .dmg</p>
+          </a>
+          <a class="download-card" data-platform-card="win" data-download="win" href="https://github.com/jsanzdev/punchboard/releases/latest" target="_blank" rel="noopener">
+            <h3>Windows</h3>
+            <p>.exe installer</p>
+          </a>
+          <a class="download-card" data-platform-card="linux" data-download="linux" href="https://github.com/jsanzdev/punchboard/releases/latest" target="_blank" rel="noopener">
+            <h3>Linux</h3>
+            <p>.AppImage</p>
+          </a>
+        </div>
+        <p class="downloads__all">
+          Or browse <a href="https://github.com/jsanzdev/punchboard/releases" target="_blank" rel="noopener">all releases on GitHub</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <p>&copy; 2026 Jesus Sanz · <a href="https://github.com/jsanzdev/punchboard/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></p>
+      <div class="site-footer__links">
+        <a href="https://github.com/jsanzdev/punchboard" target="_blank" rel="noopener">GitHub</a>
+        <a href="./app/">Open the app</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./downloads.js"></script>
+</body>
+</html>
