@@ -8,8 +8,20 @@ export interface FileAPI {
   writeFile(data: string): Promise<boolean>;
 }
 
+export type UpdateCheckResult =
+  | { status: "unsupported"; message: string }
+  | { status: "error"; message: string }
+  | { status: "available"; version: string }
+  | { status: "not-available"; version: string };
+
+export interface UpdateAPI {
+  isElectron: true;
+  check(): Promise<UpdateCheckResult>;
+}
+
 declare global {
   interface Window {
     fileAPI?: FileAPI;
+    updateAPI?: UpdateAPI;
   }
 }

@@ -56,6 +56,7 @@ export interface TrackerData {
   currency: CurrencyCode;
   secondaryCurrency: CurrencyCode;
   conversionRate: number;
+  currencyConversionEnabled: boolean;
   taxPercent: number;
   extraDeduction: number;
   defaultHours: number;

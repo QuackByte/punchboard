@@ -26,3 +26,8 @@ contextBridge.exposeInMainWorld("fileAPI", {
   writeFile: (data: string): Promise<boolean> =>
     ipcRenderer.invoke("file:write", data),
 });
+
+contextBridge.exposeInMainWorld("updateAPI", {
+  isElectron: true,
+  check: () => ipcRenderer.invoke("updates:check"),
+});

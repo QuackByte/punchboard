@@ -1,4 +1,4 @@
-import { ReactNode, useRef } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   ActivityLogEntry,
@@ -44,6 +45,8 @@ interface ConfigPanelProps {
   onSecondaryCurrencyChange: (value: CurrencyCode) => void;
   conversionRate: number;
   onConversionRateChange: (value: number) => void;
+  currencyConversionEnabled: boolean;
+  onCurrencyConversionEnabledChange: (value: boolean) => void;
   taxPercent: number;
   onTaxPercentChange: (value: number) => void;
   extraDeduction: number;
@@ -125,6 +128,8 @@ export default function ConfigPanel({
   onSecondaryCurrencyChange,
   conversionRate,
   onConversionRateChange,
+  currencyConversionEnabled,
+  onCurrencyConversionEnabledChange,
   taxPercent,
   onTaxPercentChange,
   extraDeduction,
@@ -141,9 +146,30 @@ export default function ConfigPanel({
   onChangeFile,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleCheckForUpdates = async () => {
+    if (!window.updateAPI) return;
+
+    setCheckingForUpdates(true);
+    setUpdateStatus(null);
+    try {
+      const result = await window.updateAPI.check();
+      if (result.status === "available") {
+        setUpdateStatus(`Update v${result.version} found — downloading...`);
+      } else if (result.status === "not-available") {
+        setUpdateStatus(`You're up to date (v${result.version}).`);
+      } else {
+        setUpdateStatus(result.message);
+      }
+    } finally {
+      setCheckingForUpdates(false);
+    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,6 +249,25 @@ export default function ConfigPanel({
               onChange={handleFileChange}
             />
           </div>
+
+          {isFileMode ? (
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                disabled={checkingForUpdates}
+                onClick={handleCheckForUpdates}
+              >
+                {checkingForUpdates ? "Checking..." : "Check for updates"}
+              </Button>
+              {updateStatus ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {updateStatus}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </Section>
 
         <Section title="Schedule">
@@ -336,38 +381,58 @@ export default function ConfigPanel({
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <CurrencySelect
+              value={currency}
+              onChange={onCurrencyChange}
+              ariaLabel="Primary currency"
+            />
+          </div>
+
           <div>
-            <Label>Currency conversion</Label>
-            <div className="mt-2 flex items-center gap-2">
-              <CurrencySelect
-                value={currency}
-                onChange={onCurrencyChange}
-                ariaLabel="Primary currency"
-              />
-              <span className="shrink-0 text-muted-foreground">→</span>
-              <CurrencySelect
-                value={secondaryCurrency}
-                onChange={onSecondaryCurrencyChange}
-                ariaLabel="Secondary currency"
+            <div className="flex items-center justify-between">
+              <Label htmlFor="currency-conversion-enabled">
+                Currency conversion
+              </Label>
+              <Switch
+                id="currency-conversion-enabled"
+                checked={currencyConversionEnabled}
+                onCheckedChange={onCurrencyConversionEnabledChange}
               />
             </div>
 
-            {currency !== secondaryCurrency ? (
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="conversion-rate">
-                  Conversion rate ({currency} → {secondaryCurrency})
-                </Label>
-                <Input
-                  id="conversion-rate"
-                  type="number"
-                  min={0}
-                  step={0.0001}
-                  value={conversionRate}
-                  onChange={(event) =>
-                    onConversionRateChange(Number(event.target.value))
-                  }
-                />
-              </div>
+            {currencyConversionEnabled ? (
+              <>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {currency} →
+                  </span>
+                  <CurrencySelect
+                    value={secondaryCurrency}
+                    onChange={onSecondaryCurrencyChange}
+                    ariaLabel="Secondary currency"
+                  />
+                </div>
+
+                {currency !== secondaryCurrency ? (
+                  <div className="mt-3 space-y-2">
+                    <Label htmlFor="conversion-rate">
+                      Conversion rate ({currency} → {secondaryCurrency})
+                    </Label>
+                    <Input
+                      id="conversion-rate"
+                      type="number"
+                      min={0}
+                      step={0.0001}
+                      value={conversionRate}
+                      onChange={(event) =>
+                        onConversionRateChange(Number(event.target.value))
+                      }
+                    />
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
         </Section>
@@ -387,6 +452,14 @@ export default function ConfigPanel({
               </div>
             )}
           </div>
+        </Section>
+
+        <Section title="About">
+          <p className="text-xs text-muted-foreground">
+            Punchboard v{__APP_VERSION__}
+            <br />
+            &copy; {new Date().getFullYear()} Jesus Sanz &middot; MIT License
+          </p>
         </Section>
       </SheetContent>
     </Sheet>

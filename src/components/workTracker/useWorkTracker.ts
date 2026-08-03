@@ -42,6 +42,7 @@ export function useWorkTracker() {
   const DEFAULT_CURRENCY: CurrencyCode = "GBP";
   const DEFAULT_SECONDARY_CURRENCY: CurrencyCode = "EUR";
   const DEFAULT_CONVERSION_RATE = 1;
+  const DEFAULT_CURRENCY_CONVERSION_ENABLED = false;
 
   const [monthKey, setMonthKey] = useState<string>(initialUiState.monthKey);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([
@@ -60,6 +61,8 @@ export function useWorkTracker() {
   const [conversionRate, setConversionRate] = useState<number>(
     DEFAULT_CONVERSION_RATE,
   );
+  const [currencyConversionEnabled, setCurrencyConversionEnabled] =
+    useState<boolean>(DEFAULT_CURRENCY_CONVERSION_ENABLED);
   const [taxPercent, setTaxPercent] = useState<number>(0);
   const [extraDeduction, setExtraDeduction] = useState<number>(0);
   const [payslipStartDay, setPayslipStartDay] = useState<number>(21);
@@ -213,6 +216,9 @@ export function useWorkTracker() {
               typeof data.conversionRate === "number"
                 ? Math.max(0, data.conversionRate)
                 : DEFAULT_CONVERSION_RATE,
+            currencyConversionEnabled:
+              data.currencyConversionEnabled ??
+              DEFAULT_CURRENCY_CONVERSION_ENABLED,
           };
         }
       } catch {
@@ -227,6 +233,7 @@ export function useWorkTracker() {
       currency: DEFAULT_CURRENCY,
       secondaryCurrency: DEFAULT_SECONDARY_CURRENCY,
       conversionRate: DEFAULT_CONVERSION_RATE,
+      currencyConversionEnabled: DEFAULT_CURRENCY_CONVERSION_ENABLED,
     };
   };
 
@@ -270,6 +277,30 @@ export function useWorkTracker() {
       try {
         const data = JSON.parse(raw) as TrackerData;
         const nextData: TrackerData = { ...data, [field]: value };
+        safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
+      } catch {
+        // ignore corrupted month data
+      }
+    });
+  };
+
+  const updateCurrentAndFutureMonthsCurrencyConversionEnabled = (
+    value: boolean,
+  ) => {
+    const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
+
+    monthsToUpdate.forEach((mk) => {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (!raw) {
+        return;
+      }
+
+      try {
+        const data = JSON.parse(raw) as TrackerData;
+        const nextData: TrackerData = {
+          ...data,
+          currencyConversionEnabled: value,
+        };
         safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
       } catch {
         // ignore corrupted month data
@@ -428,6 +459,15 @@ export function useWorkTracker() {
     addActivity("value-change", `Updated conversion rate to ${clamped}`);
   };
 
+  const onCurrencyConversionEnabledChange = (value: boolean) => {
+    setCurrencyConversionEnabled(value);
+    updateCurrentAndFutureMonthsCurrencyConversionEnabled(value);
+    addActivity(
+      "value-change",
+      `${value ? "Enabled" : "Disabled"} currency conversion`,
+    );
+  };
+
   const onTaxPercentChange = (value: number) => {
     const clamped = clampPercent(value);
     setTaxPercent(clamped);
@@ -531,6 +571,7 @@ export function useWorkTracker() {
       setCurrency(carryForward.currency);
       setSecondaryCurrency(carryForward.secondaryCurrency);
       setConversionRate(carryForward.conversionRate);
+      setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
@@ -558,6 +599,9 @@ export function useWorkTracker() {
           ? data.conversionRate
           : DEFAULT_CONVERSION_RATE,
       );
+      setCurrencyConversionEnabled(
+        data.currencyConversionEnabled ?? DEFAULT_CURRENCY_CONVERSION_ENABLED,
+      );
       setTaxPercent(data.taxPercent ?? 0);
       setExtraDeduction(data.extraDeduction ?? 0);
       setDefaultHours(
@@ -577,6 +621,7 @@ export function useWorkTracker() {
       setCurrency(carryForward.currency);
       setSecondaryCurrency(carryForward.secondaryCurrency);
       setConversionRate(carryForward.conversionRate);
+      setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
@@ -600,6 +645,7 @@ export function useWorkTracker() {
       currency,
       secondaryCurrency,
       conversionRate,
+      currencyConversionEnabled,
       taxPercent,
       extraDeduction,
       defaultHours,
@@ -627,6 +673,7 @@ export function useWorkTracker() {
     currency,
     secondaryCurrency,
     conversionRate,
+    currencyConversionEnabled,
     taxPercent,
     extraDeduction,
     defaultHours,
@@ -650,6 +697,7 @@ export function useWorkTracker() {
       currency,
       secondaryCurrency,
       conversionRate,
+      currencyConversionEnabled,
       taxPercent,
       extraDeduction,
       defaultHours,
@@ -682,6 +730,7 @@ export function useWorkTracker() {
     currency,
     secondaryCurrency,
     conversionRate,
+    currencyConversionEnabled,
     taxPercent,
     extraDeduction,
     defaultHours,
@@ -978,6 +1027,7 @@ export function useWorkTracker() {
       currency,
       secondaryCurrency,
       conversionRate,
+      currencyConversionEnabled,
       taxPercent,
       extraDeduction,
       defaultHours,
@@ -1041,6 +1091,7 @@ export function useWorkTracker() {
     currency,
     secondaryCurrency,
     conversionRate,
+    currencyConversionEnabled,
     taxPercent,
     extraDeduction,
     payslipStartDay,
@@ -1061,6 +1112,7 @@ export function useWorkTracker() {
     onCurrencyChange,
     onSecondaryCurrencyChange,
     onConversionRateChange,
+    onCurrencyConversionEnabledChange,
     onTaxPercentChange,
     onExtraDeductionChange,
     onPayslipStartDayChange,

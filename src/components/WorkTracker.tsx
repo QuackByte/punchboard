@@ -1,5 +1,5 @@
 import { Settings2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import CalendarGrid from "./workTracker/CalendarGrid";
@@ -27,6 +27,8 @@ export default function WorkTracker() {
     onSecondaryCurrencyChange,
     conversionRate,
     onConversionRateChange,
+    currencyConversionEnabled,
+    onCurrencyConversionEnabledChange,
     taxPercent,
     extraDeduction,
     payslipStartDay,
@@ -92,7 +94,12 @@ export default function WorkTracker() {
     <div className="min-h-screen bg-background px-4 py-8 text-foreground">
       <div className="mx-auto w-full max-w-[1700px]">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
+            <img
+              src="./punchboard_icon.svg"
+              alt=""
+              className="h-8 w-8 rounded-lg"
+            />
             Punchboard
           </h1>
 
@@ -112,6 +119,18 @@ export default function WorkTracker() {
           </div>
 
           <div className="flex items-center gap-2">
+            {!isFileMode ? (
+              <a
+                href="../#downloads"
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "sm",
+                  className: "text-xs",
+                })}
+              >
+                Get the desktop app
+              </a>
+            ) : null}
             <ThemeToggle theme={theme} onThemeChange={setTheme} />
             <Button
               variant="outline"
@@ -142,6 +161,8 @@ export default function WorkTracker() {
           onSecondaryCurrencyChange={onSecondaryCurrencyChange}
           conversionRate={conversionRate}
           onConversionRateChange={onConversionRateChange}
+          currencyConversionEnabled={currencyConversionEnabled}
+          onCurrencyConversionEnabledChange={onCurrencyConversionEnabledChange}
           taxPercent={taxPercent}
           onTaxPercentChange={onTaxPercentChange}
           extraDeduction={extraDeduction}
@@ -168,6 +189,7 @@ export default function WorkTracker() {
             extraHoursTotal={extraHoursTotal}
             currency={currency}
             secondaryCurrency={secondaryCurrency}
+            currencyConversionEnabled={currencyConversionEnabled}
             grossSalary={grossSalary}
             taxAmount={taxAmount}
             extraDeductionAmount={extraDeductionAmount}

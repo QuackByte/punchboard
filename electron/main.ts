@@ -18,6 +18,12 @@ type AutoUpdaterEvents = {
   on(event: "update-downloaded", listener: () => void): void;
 };
 
+type UpdateCheckResult =
+  | { status: "unsupported"; message: string }
+  | { status: "error"; message: string }
+  | { status: "available"; version: string }
+  | { status: "not-available"; version: string };
+
 function loadAutoUpdater(): AppUpdater | null {
   try {
     return (require("electron-updater") as typeof import("electron-updater"))
@@ -95,6 +101,38 @@ function registerFileIpcHandlers() {
       return true;
     } catch {
       return false;
+    }
+  });
+}
+
+function registerUpdateIpcHandlers() {
+  ipcMain.handle("updates:check", async (): Promise<UpdateCheckResult> => {
+    if (!app.isPackaged) {
+      return {
+        status: "unsupported",
+        message: "Updates only run in the packaged app.",
+      };
+    }
+
+    const autoUpdater = loadAutoUpdater();
+    if (!autoUpdater) {
+      return { status: "error", message: "Updater unavailable." };
+    }
+
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      const latestVersion = result?.updateInfo?.version;
+
+      if (latestVersion && latestVersion !== app.getVersion()) {
+        return { status: "available", version: latestVersion };
+      }
+      return { status: "not-available", version: app.getVersion() };
+    } catch (error) {
+      return {
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Update check failed.",
+      };
     }
   });
 }
@@ -187,6 +225,7 @@ function setupAutoUpdates() {
 
 app.whenReady().then(() => {
   registerFileIpcHandlers();
+  registerUpdateIpcHandlers();
 
   const iconPath = getAppIconPath();
 

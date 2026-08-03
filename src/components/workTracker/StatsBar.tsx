@@ -13,6 +13,7 @@ interface StatsBarProps {
   extraHoursTotal: number;
   currency: CurrencyCode;
   secondaryCurrency: CurrencyCode;
+  currencyConversionEnabled: boolean;
   grossSalary: number;
   taxAmount: number;
   extraDeductionAmount: number;
@@ -72,6 +73,7 @@ export default function StatsBar({
   extraHoursTotal,
   currency,
   secondaryCurrency,
+  currencyConversionEnabled,
   grossSalary,
   taxAmount,
   extraDeductionAmount,
@@ -83,7 +85,8 @@ export default function StatsBar({
 }: StatsBarProps) {
   const symbol = getCurrencySymbol(currency);
   const secondarySymbol = getCurrencySymbol(secondaryCurrency);
-  const showConversion = currency !== secondaryCurrency;
+  const showConversion =
+    currencyConversionEnabled && currency !== secondaryCurrency;
 
   return (
     <div className="mb-4 space-y-4">
