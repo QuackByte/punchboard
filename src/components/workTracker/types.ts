@@ -50,6 +50,8 @@ export type DayKey = (typeof daysOfWeek)[number]["key"];
 export interface TimeEntry {
   start: string;
   end: string | null;
+  /** Optional label, e.g. a client or "on call". */
+  note?: string;
 }
 export type ExceptionType = "vacation" | "sick";
 export type ActivityType =
@@ -81,7 +83,24 @@ export interface TrackerData {
   timeEntries?: Record<string, TimeEntry[]>;
 }
 
-export interface TrackerSettings {
+/**
+ * How clocked time turns into paid time. Applied when hours are calculated,
+ * never baked into the stored sessions, so changing a rule re-applies it.
+ */
+export interface WorkRules {
+  /** Unpaid break deducted on long days (0 = off). */
+  breakMinutes: number;
+  /** Deduct the break once a day reaches this many clocked hours. */
+  breakAfterHours: number;
+  /** Round each punch to the nearest N minutes (0 = exact). */
+  roundingMinutes: number;
+  /** Pay multiplier for overtime (1 = paid at the normal rate). */
+  overtimeMultiplier: number;
+  /** Also count hours beyond the schedule on workdays as overtime. */
+  overtimeIncludesLongDays: boolean;
+}
+
+export interface TrackerSettings extends Partial<WorkRules> {
   payslipStartDay: number;
 }
 
