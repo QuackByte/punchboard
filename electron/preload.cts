@@ -21,6 +21,31 @@ contextBridge.exposeInMainWorld("desktop", {
   showMainWindow: () => {
     ipcRenderer.send("window:show");
   },
+  getTrayStatus: () => ipcRenderer.invoke("tray:get-status"),
+  onTrayStatus: (listener: (status: unknown) => void) => {
+    const handler = (_event: unknown, status: unknown) => listener(status);
+    ipcRenderer.on("tray:status", handler);
+    return () => ipcRenderer.removeListener("tray:status", handler);
+  },
+  requestTrayPunch: () => {
+    ipcRenderer.send("tray:punch");
+  },
+  openMainFromTray: () => {
+    ipcRenderer.send("tray:open-main");
+  },
+  showTrayMenu: () => {
+    ipcRenderer.send("tray:show-menu");
+  },
+  resizeTray: (height: number) => {
+    ipcRenderer.send("tray:resize", height);
+  },
+  setShowTray: (enabled: boolean) =>
+    ipcRenderer.invoke("tray:set-enabled", enabled),
+  onOpenSettings: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on("settings:open", handler);
+    return () => ipcRenderer.removeListener("settings:open", handler);
+  },
   getStartupConfig: () => ipcRenderer.invoke("startup:get-config"),
   setOpenAtLogin: (enabled: boolean) =>
     ipcRenderer.invoke("startup:set-open-at-login", enabled),

@@ -1,0 +1,17 @@
+<!-- Tray icon for Windows/Linux: a simplified app icon that reads on both
+     light and dark taskbars. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="16" height="16" rx="3.6" fill="url(#bg)"/>
+  <path fill="#fff" fill-rule="evenodd" d="
+    M6.1 2.6h3.8a1.3 1.3 0 0 1 1.3 1.3v8.2a1.3 1.3 0 0 1-1.3 1.3H6.1a1.3 1.3 0 0 1-1.3-1.3V3.9a1.3 1.3 0 0 1 1.3-1.3Z
+    M8 2.1a.8.8 0 1 0 0 1.6a.8.8 0 1 0 0-1.6Z
+    M6.55 10.6a.72.72 0 1 0 0 1.44a.72.72 0 1 0 0-1.44Z
+    M8 8.75a.8.8 0 1 0 0 1.6a.8.8 0 1 0 0-1.6Z
+    M9.45 6.85a.9.9 0 1 0 0 1.8a.9.9 0 1 0 0-1.8Z"/>
+</svg>
