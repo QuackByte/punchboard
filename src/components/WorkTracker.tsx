@@ -76,6 +76,16 @@ export default function WorkTracker() {
     fileInitialized,
     chooseExistingFile,
     createNewFile,
+    browserFileSupported,
+    browserFileHandle,
+    browserFileNeedsPermission,
+    browserFileError,
+    connectBrowserDataFile,
+    saveBrowserDataToFile,
+    reconnectBrowserDataFile,
+    reloadBrowserDataFile,
+    overwriteBrowserDataFile,
+    disconnectBrowserDataFile,
   } = tracker;
 
   if (isFileMode && !fileInitialized) {
@@ -201,6 +211,16 @@ export default function WorkTracker() {
           isFileMode={isFileMode}
           filePath={tracker.filePath}
           onChangeFile={tracker.changeFile}
+          browserFileSupported={browserFileSupported}
+          hasBrowserFile={browserFileHandle !== null}
+          browserFileNeedsPermission={browserFileNeedsPermission}
+          browserFileError={browserFileError}
+          onConnectBrowserFile={connectBrowserDataFile}
+          onSaveBrowserDataToFile={saveBrowserDataToFile}
+          onReconnectBrowserFile={reconnectBrowserDataFile}
+          onReloadBrowserFile={reloadBrowserDataFile}
+          onOverwriteBrowserFile={overwriteBrowserDataFile}
+          onDisconnectBrowserFile={disconnectBrowserDataFile}
         />
 
         <main className="space-y-4">
