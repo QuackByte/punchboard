@@ -75,9 +75,7 @@ function Section({
   return (
     <div className="mt-6">
       {!first ? <Separator className="mb-6" /> : null}
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </p>
+      <p className="stamp">{title}</p>
       <div className="mt-3 space-y-4">{children}</div>
     </div>
   );
@@ -182,9 +180,9 @@ export default function ConfigPanel({
 
   return (
     <Sheet open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-sm">
+      <SheetContent side="right" className="w-full overflow-y-auto bg-popover sm:max-w-sm">
         <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
+          <SheetTitle className="text-xl tracking-tight">Settings</SheetTitle>
           <SheetDescription>
             Configure your schedule, pay, and data file.
           </SheetDescription>
@@ -283,9 +281,9 @@ export default function ConfigPanel({
                     size="sm"
                     onClick={() => onToggleDay(day.key)}
                     className={cn(
-                      "h-8 px-3",
+                      "h-8 rounded-full px-3 font-mono text-xs",
                       active &&
-                        "border-primary bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary",
+                        "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background",
                     )}
                   >
                     {day.label}
@@ -445,7 +443,14 @@ export default function ConfigPanel({
               <div className="space-y-1">
                 {recentActivity.map((entry) => (
                   <p key={entry.id} className="text-xs text-muted-foreground">
-                    {new Date(entry.timestamp).toLocaleString()} -{" "}
+                    <span className="font-mono text-[10.5px] text-muted-foreground/70">
+                      {new Date(entry.timestamp).toLocaleString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>{" "}
                     {entry.message}
                   </p>
                 ))}

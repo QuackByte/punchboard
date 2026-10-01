@@ -12,8 +12,12 @@ marketing page, or jump straight into the
 
 ## Features
 
-- **Calendar-based tracking** — click through a monthly grid to log hours per
-  day, either as a duration (`7.5`) or a time range (`9:00-17:30`).
+- **Punch clock** — punch in and out for today with one click; the running
+  session is tracked live and saved as a real start/end time.
+- **Clocked sessions** — click any day on the time card to log sessions,
+  either with quick entry (`9-13, 14-18:30`, `8:45 to 17`, or a plain total
+  like `7.5` / `7h 30m`) or by editing start/end times directly. Each day
+  shows a mini timeline of its sessions.
 - **Day exceptions** — mark days as vacation, sick leave, or holiday, with
   automatic exclusion from expected working hours.
 - **Extra hours** — track overtime separately from the regular schedule.
@@ -23,7 +27,7 @@ marketing page, or jump straight into the
 - **Currency conversion** — optionally show a second currency alongside your
   primary one, using a manual conversion rate.
 - **Yearly overview** — a chart of hours worked per month across the year.
-- **Weekly totals** — see hours summed per week alongside the monthly view.
+- **Weekly totals** — hours per ISO week against the scheduled hours.
 - **Import/export** — back up or move your data as a JSON file.
 - **Light/dark theme**.
 - **Auto-updates** on macOS, Windows, and Linux via `electron-updater`.

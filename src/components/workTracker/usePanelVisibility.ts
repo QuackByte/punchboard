@@ -11,7 +11,7 @@ function getStoredVisibility(): boolean {
   } catch {
     // ignore storage errors
   }
-  return true;
+  return false;
 }
 
 export function usePanelVisibility() {

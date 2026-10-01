@@ -3,49 +3,72 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * "Time card" palette: warm card-stock paper and near-black ink in light
+   * mode, a deep ink desk in dark mode, with the brand cyan from the icon.
+   */
   :root {
-    --background: 210 40% 96.1%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 189 94% 43%;
+    --background: 40 24% 93%;
+    --foreground: 222 18% 10%;
+    --card: 42 33% 98%;
+    --card-foreground: 222 18% 10%;
+    --popover: 42 33% 99%;
+    --popover-foreground: 222 18% 10%;
+    --primary: 191 91% 34%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 214.3 31.8% 91.4%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 214.3 31.8% 91.4%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 214.3 31.8% 91.4%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 87%;
-    --input: 214.3 31.8% 87%;
-    --ring: 189 94% 43%;
-    --radius: 0.5rem;
+    --secondary: 38 20% 88%;
+    --secondary-foreground: 222 18% 14%;
+    --muted: 38 20% 89%;
+    --muted-foreground: 222 7% 41%;
+    --accent: 38 22% 87%;
+    --accent-foreground: 222 18% 10%;
+    --destructive: 356 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 16% 82%;
+    --input: 36 14% 77%;
+    --ring: 191 91% 38%;
+    --radius: 0.875rem;
+
+    /* The punch clock is always "ink", in both themes. */
+    --ink: 222 20% 9%;
+    --ink-foreground: 40 25% 94%;
+    --ink-muted: 222 9% 62%;
+    --ink-border: 222 14% 19%;
+    --brand: 188 86% 53%;
+    --signal: 18 100% 60%;
+
+    --vacation: 38 92% 50%;
+    --sick: 350 80% 58%;
+    --extra: 262 80% 62%;
+
+    --dot: 36 14% 74%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 189 94% 43%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 189 94% 43%;
+    --background: 222 20% 6%;
+    --foreground: 40 22% 93%;
+    --card: 222 17% 9.5%;
+    --card-foreground: 40 22% 93%;
+    --popover: 222 17% 11%;
+    --popover-foreground: 40 22% 93%;
+    --primary: 188 86% 53%;
+    --primary-foreground: 195 80% 9%;
+    --secondary: 222 14% 15%;
+    --secondary-foreground: 40 22% 93%;
+    --muted: 222 14% 14%;
+    --muted-foreground: 222 9% 60%;
+    --accent: 222 14% 16%;
+    --accent-foreground: 40 22% 93%;
+    --destructive: 356 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 13% 17%;
+    --input: 222 12% 22%;
+    --ring: 188 86% 53%;
+
+    --ink: 222 22% 4%;
+    --ink-border: 222 14% 16%;
+
+    --dot: 222 12% 16%;
   }
 }
 
@@ -54,8 +77,78 @@
     @apply box-border border-border;
   }
 
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
-    @apply m-0 bg-background text-foreground antialiased;
-    font-family: "DM Sans", "Segoe UI", sans-serif;
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+    /* Perforated card-stock: a faint dot grid behind everything. */
+    background-image: radial-gradient(
+      hsl(var(--dot)) 1px,
+      transparent 1.2px
+    );
+    background-size: 22px 22px;
+    background-attachment: fixed;
+    font-feature-settings: "ss01";
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+  }
+
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Small mono uppercase label — the "stamp" on a time card. */
+  .stamp {
+    @apply font-mono text-[10.5px] font-medium uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .panel {
+    @apply rounded-2xl border bg-card text-card-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.04),0_12px_32px_-18px_hsl(var(--foreground)/0.25)];
+  }
+
+  /* Dotted leader between a label and a value, receipt style. */
+  .leader {
+    @apply mx-2 flex-1 translate-y-[-3px] border-b border-dotted border-muted-foreground/40;
+  }
+
+  /* Tear-off perforation with notches cut into the card edges. */
+  .perforation {
+    @apply relative my-4 border-t-2 border-dashed border-border;
+  }
+  .perforation::before,
+  .perforation::after {
+    content: "";
+    @apply absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-background;
+  }
+  .perforation::before {
+    left: -1.85rem;
+    box-shadow: inset -1px 0 0 hsl(var(--border));
+  }
+  .perforation::after {
+    right: -1.85rem;
+    box-shadow: inset 1px 0 0 hsl(var(--border));
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

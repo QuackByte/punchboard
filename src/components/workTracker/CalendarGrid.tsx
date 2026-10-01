@@ -1,7 +1,4 @@
-import { EllipsisVertical } from "lucide-react";
-import { Fragment, ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Fragment, ReactNode, useEffect, useRef } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -10,16 +7,21 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import HoursInput from "./HoursInput";
-import { calendarHeaders, ExceptionType } from "./types";
-import { dateKey, formatDuration } from "./utils";
+import DayEditor from "./DayEditor";
+import { calendarHeaders, ExceptionType, TimeEntry } from "./types";
+import { useNow } from "./useNow";
+import {
+  dateKey,
+  formatDuration,
+  minutesSinceMidnight,
+  parseClock,
+  sumEntriesHours,
+} from "./utils";
 
 interface SelectedMonthInfo {
   year: number;
@@ -32,16 +34,25 @@ interface CalendarGridProps {
   payslipDateLookup: Set<string>;
   workingDateLookup: Set<string>;
   selectedMonthInfo: SelectedMonthInfo;
+  periodLabel: string;
   exceptions: Record<string, ExceptionType>;
   dailyHours: Record<string, number>;
   extraHours: Record<string, number>;
   dailyActualHours: Record<string, number>;
+  timeEntries: Record<string, TimeEntry[]>;
   hoursPerDay: number;
   today: Date;
+  editingKey: string | null;
+  onEditingKeyChange: (key: string | null) => void;
   onSetException: (key: string, type: ExceptionType | "none") => void;
-  onHoursChange: (key: string, value: number) => void;
-  onExtraHoursChange: (key: string, value: number) => void;
+  onApplyDayInput: (key: string, text: string) => boolean;
+  onSetDayEntries: (key: string, entries: TimeEntry[]) => void;
+  onResetDay: (key: string) => void;
 }
+
+/** Visible window of the day for the mini timeline in each cell. */
+const TIMELINE_START = 6 * 60;
+const TIMELINE_END = 22 * 60;
 
 function chunkIntoWeeks<T>(items: T[]): T[][] {
   const weeks: T[][] = [];
@@ -51,188 +62,284 @@ function chunkIntoWeeks<T>(items: T[]): T[][] {
   return weeks;
 }
 
+function isoWeekNumber(date: Date) {
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayNumber = (target.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNumber + 3);
+  const firstThursday = new Date(target.getFullYear(), 0, 4);
+  return (
+    1 +
+    Math.round(
+      ((target.getTime() - firstThursday.getTime()) / 86400000 -
+        3 +
+        ((firstThursday.getDay() + 6) % 7)) /
+        7,
+    )
+  );
+}
+
+function Timeline({
+  entries,
+  nowMinutes,
+}: {
+  entries: TimeEntry[];
+  nowMinutes?: number;
+}) {
+  const span = TIMELINE_END - TIMELINE_START;
+  const clampPct = (minutes: number) =>
+    (Math.min(Math.max(minutes, TIMELINE_START), TIMELINE_END) -
+      TIMELINE_START) /
+    span;
+
+  return (
+    <div className="relative h-1 overflow-hidden rounded-full bg-foreground/[0.07]">
+      {entries.map((entry, index) => {
+        const start = parseClock(entry.start);
+        const endText = entry.end;
+        let end =
+          endText !== null
+            ? parseClock(endText)
+            : nowMinutes !== undefined
+              ? nowMinutes
+              : null;
+        if (start === null || end === null) {
+          return null;
+        }
+        if (end < start) {
+          end = TIMELINE_END;
+        }
+        const left = clampPct(start);
+        const width = Math.max(clampPct(end) - left, 0.02);
+        return (
+          <span
+            key={index}
+            className={cn(
+              "absolute inset-y-0 rounded-full",
+              entry.end === null ? "bg-signal" : "bg-primary",
+            )}
+            style={{ left: `${left * 100}%`, width: `${width * 100}%` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CalendarGrid({
   cells,
   payslipDateLookup,
   workingDateLookup,
   selectedMonthInfo,
+  periodLabel,
   exceptions,
   dailyHours,
   extraHours,
   dailyActualHours,
+  timeEntries,
   hoursPerDay,
   today,
+  editingKey,
+  onEditingKeyChange,
   onSetException,
-  onHoursChange,
-  onExtraHoursChange,
+  onApplyDayInput,
+  onSetDayEntries,
+  onResetDay,
 }: CalendarGridProps) {
+  const now = useNow(30_000);
+  const nowMinutes = minutesSinceMidnight(now);
+  const todayKey = dateKey(today);
+  const cellRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  // When the editor is opened from elsewhere (e.g. the punch clock), bring
+  // the day into view so its popover has something to anchor to.
+  useEffect(() => {
+    if (!editingKey) return;
+    cellRefs.current
+      .get(editingKey)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [editingKey]);
+
   const renderCell = (cell: Date | null, index: number): ReactNode => {
     if (!cell) {
-      return (
-        <div
-          key={`empty-${index}`}
-          className="h-20 rounded-lg border border-transparent bg-muted/30"
-        />
-      );
+      return <div key={`empty-${index}`} aria-hidden />;
     }
 
     const key = dateKey(cell);
     const inPayslipRange = payslipDateLookup.has(key);
     const isWorkingDay = workingDateLookup.has(key);
-    const isToday = dateKey(today) === key;
-    const isInSelectedMonth =
-      cell.getFullYear() === selectedMonthInfo.year &&
-      cell.getMonth() === selectedMonthInfo.monthIndex;
+    const isToday = todayKey === key;
     const exceptionType = exceptions[key];
-    const hoursForDay =
-      exceptionType === "vacation"
-        ? (dailyHours[key] ?? 0)
-        : (dailyHours[key] ?? hoursPerDay);
-    const canLogExtraHours = inPayslipRange && !isWorkingDay;
-    const extraHoursForDay = extraHours[key] ?? 0;
-    const monthTag = cell.toLocaleDateString("en-US", {
-      month: "short",
-    });
-
-    const backgroundClass = exceptionType
+    const entries = timeEntries[key] ?? [];
+    const liveNow = isToday ? nowMinutes : undefined;
+    const hasEntries = entries.length > 0;
+    const isRunning = entries.some((entry) => entry.end === null);
+    const hasOverride = isWorkingDay
+      ? dailyHours[key] !== undefined || hasEntries
+      : (extraHours[key] ?? 0) > 0 || hasEntries;
+    const total = hasEntries
       ? exceptionType === "vacation"
-        ? "border-amber-300/80 bg-amber-400/20 dark:border-amber-400/60"
-        : "border-rose-300/80 bg-rose-400/20 dark:border-rose-400/60"
-      : isWorkingDay
-        ? "border-primary/60 bg-primary/15"
-        : canLogExtraHours && extraHoursForDay > 0
-          ? "border-violet-300/80 bg-violet-400/20 dark:border-violet-400/60"
-          : inPayslipRange
-            ? "border-muted-foreground/30 bg-muted/70"
-            : "border-border bg-muted/30";
+        ? (dailyActualHours[key] ?? 0) -
+          sumEntriesHours(entries) +
+          sumEntriesHours(entries, liveNow)
+        : sumEntriesHours(entries, liveNow)
+      : (dailyActualHours[key] ?? 0);
+    const isScheduledOnly = isWorkingDay && !hasOverride && !exceptionType;
+    const showMonthTag = cell.getDate() === 1 || index === cells.findIndex(Boolean);
+    const isPast = cell < today && !isToday;
 
     const dayCell = (
-      <div
+      <button
+        type="button"
+        ref={(node) => {
+          if (node) cellRefs.current.set(key, node);
+          else cellRefs.current.delete(key);
+        }}
+        disabled={!inPayslipRange}
+        aria-label={`${cell.toDateString()}, ${formatDuration(total)}${exceptionType ? `, ${exceptionType}` : ""}`}
         className={cn(
-          "h-20 rounded-lg border p-2 text-left transition",
-          backgroundClass,
-          isToday && "ring-2 ring-amber-400/80",
-          !isInSelectedMonth && "opacity-80",
+          "group relative flex h-[68px] w-full flex-col rounded-lg border p-1.5 text-left sm:h-[92px] sm:rounded-xl sm:p-2.5 outline-none transition-[transform,box-shadow,background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring hover:-translate-y-px hover:shadow-md active:translate-y-0 data-[state=open]:ring-2 data-[state=open]:ring-primary",
+          exceptionType === "vacation"
+            ? "border-vacation/40 bg-[repeating-linear-gradient(135deg,hsl(var(--vacation)/0.16)_0_6px,hsl(var(--vacation)/0.08)_6px_12px)]"
+            : exceptionType === "sick"
+              ? "border-sick/40 bg-[repeating-linear-gradient(135deg,hsl(var(--sick)/0.16)_0_6px,hsl(var(--sick)/0.08)_6px_12px)]"
+              : isWorkingDay
+                ? "bg-card"
+                : hasOverride
+                  ? "border-extra/40 bg-extra/[0.07]"
+                  : "border-dashed bg-transparent hover:bg-card/60",
+          isToday && "border-primary shadow-[0_0_0_1px_hsl(var(--primary))]",
+          !inPayslipRange && "pointer-events-none opacity-40",
         )}
       >
-        <div className="flex items-center justify-between gap-1">
-          <p className="text-sm font-medium text-foreground">
+        <div className="flex items-start justify-between gap-1">
+          <span
+            className={cn(
+              "font-mono text-[13px] font-semibold leading-none",
+              !isWorkingDay && !hasOverride && "text-muted-foreground",
+              isToday &&
+                "-m-1 rounded-md bg-primary px-1 py-1 text-primary-foreground",
+            )}
+          >
             {cell.getDate()}
-          </p>
-          <div className="flex items-center gap-1">
-            {!isInSelectedMonth ? (
-              <Badge
-                variant="outline"
-                className="bg-card/80 px-1.5 py-0 text-[10px] font-normal uppercase text-muted-foreground"
+            {showMonthTag ? (
+              <span
+                className={cn(
+                  "ml-1 hidden text-[9.5px] font-medium uppercase tracking-wider sm:inline",
+                  isToday ? "text-primary-foreground/80" : "text-muted-foreground",
+                )}
               >
-                {monthTag}
-              </Badge>
+                {cell.toLocaleDateString("en-US", { month: "short" })}
+              </span>
             ) : null}
-            {isWorkingDay ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Mark vacation or sick for ${cell.toDateString()}`}
-                    className="h-6 w-6 shrink-0 rounded text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-3.5"
-                  >
-                    <EllipsisVertical />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem
-                    className="text-amber-700 focus:text-amber-700 dark:text-amber-300 dark:focus:text-amber-200"
-                    onSelect={() => onSetException(key, "vacation")}
-                  >
-                    Mark vacation
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-200"
-                    onSelect={() => onSetException(key, "sick")}
-                  >
-                    Mark sick
-                  </DropdownMenuItem>
-                  {exceptionType ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => onSetException(key, "none")}
-                      >
-                        Clear mark
-                      </DropdownMenuItem>
-                    </>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
+          </span>
+          {exceptionType ? (
+            <span
+              className={cn(
+                "font-mono text-[9.5px] font-semibold uppercase tracking-wider",
+                exceptionType === "vacation"
+                  ? "text-[hsl(32_90%_32%)] dark:text-vacation"
+                  : "text-[hsl(350_70%_42%)] dark:text-sick",
+              )}
+            >
+              {exceptionType === "vacation" ? "Vac" : "Sick"}
+            </span>
+          ) : isRunning ? (
+            <span className="h-2 w-2 animate-punch-pulse rounded-full bg-signal" />
+          ) : null}
         </div>
 
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          {exceptionType === "vacation"
-            ? "Vacation"
-            : exceptionType === "sick"
-              ? "Sick"
-              : isWorkingDay
-                ? "Workday"
-                : canLogExtraHours && extraHoursForDay > 0
-                  ? "Extra hours"
-                  : inPayslipRange
-                    ? "In period"
-                    : "-"}
-        </p>
-
-        {isWorkingDay ? (
-          <HoursInput
-            className={cn(
-              "mt-1 h-6 rounded border-transparent bg-transparent px-1.5 py-0.5 text-[10px] transition-colors hover:border-input/80 hover:bg-card/70 focus-visible:border-input/80 focus-visible:bg-card/70 focus-visible:ring-1 focus-visible:ring-offset-0 md:text-[10px]",
-              hoursForDay === hoursPerDay
-                ? "text-muted-foreground hover:text-foreground focus-visible:text-foreground"
-                : "font-semibold text-foreground",
+        <div className="mt-auto">
+          {exceptionType === "sick" ? null : total > 0 || isWorkingDay ? (
+            <p
+              className={cn(
+                "font-mono text-[11px] font-semibold leading-none tabular sm:text-[15px]",
+                isScheduledOnly &&
+                  cn(
+                    "font-medium text-muted-foreground/80",
+                    !isPast && "text-muted-foreground/55",
+                  ),
+                !isWorkingDay && hasOverride && "text-[hsl(262_60%_45%)] dark:text-extra",
+              )}
+            >
+              {!isWorkingDay && hasOverride ? "+" : ""}
+              {formatDuration(total)}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              + Log extra
+            </p>
+          )}
+          <div className="mt-2">
+            {hasEntries ? (
+              <Timeline entries={entries} nowMinutes={liveNow} />
+            ) : (
+              <div
+                className={cn(
+                  "h-1 rounded-full",
+                  isScheduledOnly
+                    ? "border-t border-dashed border-muted-foreground/30"
+                    : "",
+                )}
+              />
             )}
-            value={hoursForDay}
-            onClick={(event) => event.stopPropagation()}
-            onCommit={(value) => onHoursChange(key, value)}
+          </div>
+        </div>
+      </button>
+    );
+
+    const popover = (
+      <Popover
+        open={editingKey === key}
+        onOpenChange={(open) => onEditingKeyChange(open ? key : null)}
+      >
+        <PopoverTrigger asChild>{dayCell}</PopoverTrigger>
+        <PopoverContent className="w-[330px]" align="start">
+          <DayEditor
+            date={cell}
+            isWorkingDay={isWorkingDay}
+            isToday={isToday}
+            exceptionType={exceptionType}
+            entries={entries}
+            totalHours={total}
+            hasOverride={hasOverride}
+            hoursPerDay={hoursPerDay}
+            nowMinutes={nowMinutes}
+            onApplyText={(text) => onApplyDayInput(key, text)}
+            onSetEntries={(next) => onSetDayEntries(key, next)}
+            onReset={() => onResetDay(key)}
+            onSetException={(type) => onSetException(key, type)}
           />
-        ) : canLogExtraHours ? (
-          <HoursInput
-            className="mt-1 h-6 rounded border-violet-300 bg-card/70 px-1.5 py-0.5 text-[10px] focus-visible:ring-1 focus-visible:ring-violet-500 focus-visible:ring-offset-0 md:text-[10px] dark:border-violet-700"
-            placeholder="+ extra hrs"
-            blankWhenZero
-            value={extraHoursForDay}
-            onClick={(event) => event.stopPropagation()}
-            onCommit={(value) => onExtraHoursChange(key, value)}
-          />
-        ) : null}
-      </div>
+        </PopoverContent>
+      </Popover>
     );
 
     if (!isWorkingDay) {
-      return <div key={key}>{dayCell}</div>;
+      return <Fragment key={key}>{popover}</Fragment>;
     }
 
     return (
       <ContextMenu key={key}>
-        <ContextMenuTrigger asChild>{dayCell}</ContextMenuTrigger>
-        <ContextMenuContent className="w-40">
-          <ContextMenuItem
-            className="text-amber-700 focus:text-amber-700 dark:text-amber-300 dark:focus:text-amber-200"
-            onSelect={() => onSetException(key, "vacation")}
-          >
-            Mark vacation
+        <ContextMenuTrigger asChild>
+          <div>{popover}</div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-44">
+          <ContextMenuItem onSelect={() => onEditingKeyChange(key)}>
+            Log times…
           </ContextMenuItem>
-          <ContextMenuItem
-            className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-200"
-            onSelect={() => onSetException(key, "sick")}
-          >
-            Mark sick
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => onSetException(key, "vacation")}>
+            <span className="mr-2 h-1.5 w-1.5 rounded-full bg-vacation" />
+            {exceptionType === "vacation" ? "Unmark vacation" : "Mark vacation"}
           </ContextMenuItem>
-          {exceptionType ? (
+          <ContextMenuItem onSelect={() => onSetException(key, "sick")}>
+            <span className="mr-2 h-1.5 w-1.5 rounded-full bg-sick" />
+            {exceptionType === "sick" ? "Unmark sick" : "Mark sick"}
+          </ContextMenuItem>
+          {hasOverride ? (
             <>
               <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => onSetException(key, "none")}>
-                Clear mark
+              <ContextMenuItem onSelect={() => onResetDay(key)}>
+                Reset to schedule
               </ContextMenuItem>
             </>
           ) : null}
@@ -242,50 +349,121 @@ export default function CalendarGrid({
   };
 
   return (
-    <>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {selectedMonthInfo.label}
-        </p>
+    <section aria-label="Time card" className="panel p-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <span className="stamp">04 · Time card</span>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            {selectedMonthInfo.label}
+            <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
+              {periodLabel}
+            </span>
+          </h2>
+        </div>
         <p className="text-xs text-muted-foreground">
-          <span aria-hidden="true">⋮</span> or right-click a workday to mark
-          vacation/sick
+          Click a day to log times · right-click to mark
         </p>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 border-b pb-2 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {calendarHeaders.map((header) => (
-          <div key={header}>{header}</div>
+      <div className="grid grid-cols-7 gap-1 sm:grid-cols-[repeat(7,minmax(0,1fr))_minmax(64px,84px)] sm:gap-2">
+        {calendarHeaders.map((header, index) => (
+          <div
+            key={header}
+            className={cn(
+              "stamp pb-1 pl-1 text-[9px] tracking-[0.08em] sm:text-[10.5px] sm:tracking-[0.14em]",
+              index >= 5 && "text-muted-foreground/60",
+            )}
+          >
+            {header}
+          </div>
         ))}
-      </div>
+        <div className="stamp hidden pb-1 text-right sm:block">Week</div>
 
-      <div className="mt-2 grid grid-cols-7 gap-2">
         {chunkIntoWeeks(cells).map((week, weekIndex) => {
-          const hasAnyDate = week.some((cell) => cell !== null);
+          const firstDate = week.find((cell): cell is Date => cell !== null);
           const weekTotal = week.reduce((total, cell) => {
             if (!cell) {
               return total;
             }
             return total + (dailyActualHours[dateKey(cell)] ?? 0);
           }, 0);
+          const weekScheduled = week.reduce(
+            (total, cell) =>
+              cell && workingDateLookup.has(dateKey(cell))
+                ? total + hoursPerDay
+                : total,
+            0,
+          );
 
           return (
             <Fragment key={`week-${weekIndex}`}>
-              {week.map((cell, index) => renderCell(cell, weekIndex * 7 + index))}
-              {hasAnyDate ? (
-                <div className="col-span-7 mb-1 flex items-center justify-end gap-1.5 px-1 text-[11px] text-muted-foreground">
-                  <span className="font-medium uppercase tracking-wide">
-                    Week total
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatDuration(weekTotal)}
-                  </span>
-                </div>
-              ) : null}
+              {week.map((cell, index) =>
+                renderCell(cell, weekIndex * 7 + index),
+              )}
+              <div className="hidden flex-col items-end justify-center rounded-xl border border-dashed px-2 text-right sm:flex">
+                {firstDate ? (
+                  <>
+                    <span className="font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground">
+                      W{isoWeekNumber(firstDate)}
+                    </span>
+                    <span className="mt-1 font-mono text-sm font-semibold tabular">
+                      {formatDuration(weekTotal)}
+                    </span>
+                    {weekScheduled > 0 ? (
+                      <span
+                        className={cn(
+                          "font-mono text-[10px] tabular",
+                          weekTotal >= weekScheduled
+                            ? "text-primary"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        /{formatDuration(weekScheduled)}
+                      </span>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </Fragment>
           );
         })}
       </div>
-    </>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-3 text-[11px] text-muted-foreground">
+        <LegendItem swatch={<span className="font-mono font-semibold text-foreground">8h</span>}>
+          Logged
+        </LegendItem>
+        <LegendItem swatch={<span className="font-mono text-muted-foreground/60">8h</span>}>
+          Scheduled
+        </LegendItem>
+        <LegendItem swatch={<span className="h-1 w-5 rounded-full bg-primary" />}>
+          Sessions (6:00–22:00)
+        </LegendItem>
+        <LegendItem swatch={<span className="h-2.5 w-2.5 rounded-sm bg-vacation/60" />}>
+          Vacation
+        </LegendItem>
+        <LegendItem swatch={<span className="h-2.5 w-2.5 rounded-sm bg-sick/60" />}>
+          Sick
+        </LegendItem>
+        <LegendItem swatch={<span className="h-2.5 w-2.5 rounded-sm bg-extra/60" />}>
+          Extra hours
+        </LegendItem>
+      </div>
+    </section>
+  );
+}
+
+function LegendItem({
+  swatch,
+  children,
+}: {
+  swatch: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {swatch}
+      {children}
+    </span>
   );
 }
