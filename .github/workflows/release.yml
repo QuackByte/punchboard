@@ -6,6 +6,12 @@ on:
       - main
     tags:
       - punchboard-v*
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing Punchboard release tag to build
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -14,10 +20,10 @@ permissions:
 jobs:
   release:
     name: Create release + changelog
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     env:
-      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASES_TOKEN != '' && secrets.RELEASES_TOKEN || github.token }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -71,9 +77,15 @@ jobs:
       - name: Prepare App Store Connect API key
         if: matrix.platform.name == 'macOS'
         shell: bash
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
+          if [ -z "$APPLE_API_KEY_BASE64" ]; then
+            echo "Missing APPLE_API_KEY_P8 Actions secret or repository access."
+            exit 1
+          fi
           KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          echo -n "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$KEY_PATH"
+          echo -n "$APPLE_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
       # macOS: sign with the Developer ID cert (from the base64 .p12 secret) and
@@ -126,7 +138,7 @@ jobs:
 
   build-tag-release:
     name: Build ${{ matrix.platform.name }} for tag
-    if: startsWith(github.ref, 'refs/tags/punchboard-v')
+    if: startsWith(github.ref, 'refs/tags/punchboard-v') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag_name, 'punchboard-v'))
     runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false
@@ -144,6 +156,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
 
       - uses: actions/setup-node@v6
         with:
@@ -159,9 +173,15 @@ jobs:
       - name: Prepare App Store Connect API key
         if: matrix.platform.name == 'macOS'
         shell: bash
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
+          if [ -z "$APPLE_API_KEY_BASE64" ]; then
+            echo "Missing APPLE_API_KEY_P8 Actions secret or repository access."
+            exit 1
+          fi
           KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          echo -n "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$KEY_PATH"
+          echo -n "$APPLE_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
       # macOS: sign with the Developer ID cert (from the base64 .p12 secret) and
@@ -197,9 +217,10 @@ jobs:
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
         shell: bash
         run: |
-          gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes || true
+          gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --generate-notes || true
 
           # Upload app installers and electron-updater metadata, not icons or web assets.
           files=()
@@ -212,4 +233,4 @@ jobs:
             exit 1
           fi
 
-          gh release upload "${{ github.ref_name }}" "${files[@]}" --clobber
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
