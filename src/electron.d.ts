@@ -31,6 +31,7 @@ export interface DesktopAPI {
   isElectron: true;
   platform: string;
   onTrayPunchToggle(listener: () => void): () => void;
+  onOpenAtLoginChanged(listener: (enabled: boolean) => void): () => void;
   updateTrayStatus(status: TrayStatus): void;
   showMainWindow(): void;
   getStartupConfig(): Promise<{ available: boolean; openAtLogin: boolean }>;
