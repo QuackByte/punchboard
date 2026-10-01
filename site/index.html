@@ -3,143 +3,244 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Punchboard — track hours, estimate pay</title>
-  <meta name="description" content="A free, open-source desktop and web app for tracking daily work hours, vacation and sick days, and estimating gross/net pay. Your data stays in a file you control." />
+  <title>Punchboard — punch in, know your pay</title>
+  <meta name="description" content="A free, open-source time card for your desktop and browser. Punch in and out, log sessions by typing 9-13, 14-18, track vacation and sick days, and see your estimated pay. Your data stays in a file you control." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f2efe8" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c0f14" media="(prefers-color-scheme: dark)" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Punchboard — punch in, know your pay" />
+  <meta property="og:description" content="A free, open-source time card for your desktop and browser. Your data stays in a file you control." />
+  <meta property="og:image" content="https://quackbyte.dev/punchboard/assets/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
+  <link rel="preload" href="./assets/fonts/bricolage-grotesque-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="./assets/fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container site-header__inner">
       <a class="brand" href="./">
-        <img class="brand__mark" src="./assets/logo.svg" alt="" width="32" height="32" />
-        <span class="brand__name">Punchboard</span>
+        <img class="brand__mark" src="./assets/logo.svg" alt="" width="34" height="34" />
+        <span class="brand__text">
+          <span class="brand__name">Punchboard</span>
+          <span class="brand__tag">Time card</span>
+        </span>
       </a>
-      <nav class="site-nav">
+      <nav class="site-nav" aria-label="Main">
         <a href="#features">Features</a>
         <a href="#downloads">Download</a>
         <a href="https://github.com/QuackByte/punchboard" target="_blank" rel="noopener">GitHub</a>
-        <a class="button button--primary" href="./app/">Open the app</a>
+        <a class="button button--ink" href="./app/">Open the app</a>
       </nav>
     </div>
   </header>
 
   <main>
+    <!-- Hero -->
     <section class="hero">
-      <div class="container hero__inner">
+      <div class="container">
         <div class="hero__copy">
-          <p class="eyebrow">Free &amp; open source · MIT licensed</p>
-          <h1>Track your hours.<br />Know your pay.</h1>
+          <p class="stamp stamp--pill">
+            <span class="dot dot--live" aria-hidden="true"></span>
+            Free &amp; open source · <span data-version>latest</span>
+          </p>
+          <h1>Punch in.<br /><span class="hero__accent">Know your pay.</span></h1>
           <p class="hero__subtitle">
-            Punchboard logs daily work hours on a calendar, tracks vacation and
-            sick days, and estimates your gross and net pay — with tax,
-            deductions, and currency conversion built in. Your data lives in a
-            plain file you choose, not someone else's server.
+            A time card for people paid by the hour. Clock in with one click,
+            log a day by typing <code>9-13, 14-18</code>, and watch your hours
+            turn into a payslip estimate. No account, no server — your data
+            lives in a file you choose.
           </p>
           <div class="hero__actions">
-            <a class="button button--primary button--large" href="./app/">Open the app</a>
+            <a class="button button--primary button--large" href="./app/">Open in your browser</a>
             <a class="button button--ghost button--large" href="#downloads">Download for desktop</a>
           </div>
-        </div>
-        <div class="hero__mockup" aria-hidden="true">
-          <div class="mock-window">
-            <div class="mock-window__bar">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="mock-stats">
-              <div class="mock-stat mock-stat--cyan">
-                <div class="mock-stat__label">Working days</div>
-                <div class="mock-stat__value">23</div>
-              </div>
-              <div class="mock-stat mock-stat--amber">
-                <div class="mock-stat__label">Vacation</div>
-                <div class="mock-stat__value">2</div>
-              </div>
-              <div class="mock-stat mock-stat--green">
-                <div class="mock-stat__label">Net pay</div>
-                <div class="mock-stat__value">£2760</div>
-              </div>
-            </div>
-            <div class="mock-grid">
-              <div class="mock-day"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day mock-day--off"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day mock-day--off"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day mock-day--vacation"></div>
-              <div class="mock-day"></div>
-              <div class="mock-day mock-day--off"></div>
-              <div class="mock-day mock-day--off"></div>
-            </div>
+
+          <div class="typer" aria-hidden="true">
+            <span class="typer__label">Quick entry</span>
+            <span class="typer__field"><span data-typer-input>9-13, 14-18:30</span><span class="typer__caret"></span></span>
+            <span class="typer__result" data-typer-result>→ 2 sessions · 8h 30m</span>
           </div>
         </div>
+
+        <figure class="hero__shot">
+          <div class="window">
+            <div class="window__bar" aria-hidden="true"><span></span><span></span><span></span></div>
+            <picture>
+              <source srcset="./assets/screens/mobile-dark.webp" media="(max-width: 720px) and (prefers-color-scheme: dark)" />
+              <source srcset="./assets/screens/mobile-light.webp" media="(max-width: 720px)" />
+              <source srcset="./assets/screens/dashboard-dark.webp" media="(prefers-color-scheme: dark)" />
+              <img src="./assets/screens/dashboard-light.webp" width="1360" height="1519"
+                alt="The Punchboard dashboard: a running punch clock, hours and payslip summaries, and a monthly time card with logged sessions." />
+            </picture>
+          </div>
+          <picture class="hero__float">
+            <source srcset="./assets/screens/day-editor-dark.webp" media="(prefers-color-scheme: dark)" />
+            <img src="./assets/screens/day-editor-light.webp" width="331" height="432" loading="lazy"
+              alt="The day editor, with quick entry and editable sessions." />
+          </picture>
+        </figure>
       </div>
     </section>
 
-    <section id="features" class="features">
+    <!-- 01 Punch clock -->
+    <section id="features" class="spotlight">
+      <div class="container spotlight__inner">
+        <div class="spotlight__copy">
+          <p class="stamp">01 · Punch clock</p>
+          <h2>One click in.<br />One click out.</h2>
+          <p>
+            Hit <strong>Punch in</strong> when you start and <strong>Punch out</strong> when you
+            stop. Every session is saved with its real start and end time, and today's
+            progress ticks along live against your schedule.
+          </p>
+          <ul class="checklist">
+            <li>Punch from the <strong>menu bar or system tray</strong> without opening the window</li>
+            <li>Optionally <strong>open at login</strong>, so it's there when you sit down</li>
+            <li>Forgot to punch out yesterday? It asks for an end time instead of guessing</li>
+          </ul>
+        </div>
+        <picture class="spotlight__media spotlight__media--clock">
+          <source srcset="./assets/screens/punch-clock-dark.webp" media="(prefers-color-scheme: dark)" />
+          <img src="./assets/screens/punch-clock-light.webp" width="407" height="325" loading="lazy"
+            alt="The punch clock, on the clock since 13:15 with two sessions logged today." />
+        </picture>
+      </div>
+    </section>
+
+    <!-- 02 Quick entry -->
+    <section class="spotlight spotlight--flip">
+      <div class="container spotlight__inner">
+        <div class="spotlight__copy">
+          <p class="stamp">02 · Quick entry</p>
+          <h2>Type times the way you&nbsp;think.</h2>
+          <p>
+            Click any day on the time card and just write it down. Punchboard
+            reads the times and shows you what it understood before saving.
+          </p>
+          <dl class="examples">
+            <div><dt><code>9-13, 14-18:30</code></dt><dd>2 sessions · 8h 30m</dd></div>
+            <div><dt><code>8:45 to 17</code></dt><dd>1 session · 8h 15m</dd></div>
+            <div><dt><code>9am-5pm</code></dt><dd>1 session · 8h</dd></div>
+            <div><dt><code>22-2</code></dt><dd>overnight · 4h</dd></div>
+            <div><dt><code>7h 30m</code></dt><dd>7h 30m total</dd></div>
+          </dl>
+        </div>
+        <picture class="spotlight__media spotlight__media--editor">
+          <source srcset="./assets/screens/day-editor-dark.webp" media="(prefers-color-scheme: dark)" />
+          <img src="./assets/screens/day-editor-light.webp" width="331" height="432" loading="lazy"
+            alt="The day editor showing a quick entry being parsed into two sessions." />
+        </picture>
+      </div>
+    </section>
+
+    <!-- 03 Everything else -->
+    <section class="features">
       <div class="container">
-        <h2>Everything you need to track a work week</h2>
+        <p class="stamp">03 · The whole time card</p>
+        <h2>Everything a paid-by-the-hour month needs.</h2>
+
         <div class="features__grid">
-          <div class="feature-card">
-            <h3>Calendar-based tracking</h3>
-            <p>Log hours per day as a duration or a time range, right from a monthly grid.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Day exceptions</h3>
-            <p>Mark vacation, sick leave, or holidays — excluded automatically from expected hours.</p>
-          </div>
-          <div class="feature-card">
+          <article class="feature feature--wide">
+            <div>
+              <h3>Payslip estimate</h3>
+              <p>Hourly rate, tax and deductions turn into gross and net pay for your actual payslip period — with a custom start day and an optional second currency.</p>
+            </div>
+            <div class="receipt" aria-hidden="true">
+              <div><span>Gross</span><i></i><span>£3,974.80</span></div>
+              <div class="muted"><span>Tax 20%</span><i></i><span>−£794.96</span></div>
+              <div class="muted"><span>Deductions</span><i></i><span>−£45.00</span></div>
+              <hr />
+              <div class="receipt__net"><span>Net pay</span><strong>£3,134.84</strong></div>
+            </div>
+          </article>
+
+          <article class="feature">
+            <span class="swatch swatch--vacation" aria-hidden="true"></span>
+            <h3>Vacation &amp; sick days</h3>
+            <p>Mark a day and it's handled — vacation counts as paid hours, sick days don't.</p>
+          </article>
+
+          <article class="feature">
+            <span class="swatch swatch--extra" aria-hidden="true"></span>
             <h3>Extra hours</h3>
-            <p>Track overtime separately from your regular schedule.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Salary estimation</h3>
-            <p>Set an hourly rate, tax percentage, and deductions to see estimated gross and net pay.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Currency conversion</h3>
-            <p>Show a second currency alongside your primary one, using a manual conversion rate.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Yearly overview</h3>
-            <p>A chart of hours worked per month, plus weekly totals in the calendar view.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Import / export</h3>
-            <p>Back up or move your data as a plain JSON file, any time.</p>
-          </div>
-          <div class="feature-card">
+            <p>Worked a Saturday? Log it and it's tracked separately from your schedule.</p>
+          </article>
+
+          <article class="feature feature--wide feature--media">
+            <div>
+              <h3>Your year at a glance</h3>
+              <p>Hours per month, yearly total and average. Click a bar to jump to that month. Weekly totals sit right beside the calendar.</p>
+            </div>
+            <picture>
+              <source srcset="./assets/screens/year-dark.webp" media="(prefers-color-scheme: dark)" />
+              <img src="./assets/screens/year-light.webp" width="1312" height="320" loading="lazy" alt="Yearly overview bar chart of hours per month." />
+            </picture>
+          </article>
+
+          <article class="feature">
+            <span class="swatch swatch--file" aria-hidden="true"></span>
             <h3>Your data, your file</h3>
-            <p>No account, no server. Store your data anywhere — iCloud, Dropbox, or a local folder.</p>
-          </div>
+            <p>A plain JSON file in iCloud, Dropbox or any folder. The browser version can autosave to a file too.</p>
+          </article>
+
+          <article class="feature">
+            <span class="swatch swatch--update" aria-hidden="true"></span>
+            <h3>Updates itself</h3>
+            <p>Desktop apps check for new versions and install them on restart. Light and dark themes included.</p>
+          </article>
         </div>
       </div>
     </section>
 
+    <!-- Browser / mobile -->
+    <section class="anywhere">
+      <div class="container anywhere__inner">
+        <picture class="anywhere__phone">
+          <source srcset="./assets/screens/mobile-dark.webp" media="(prefers-color-scheme: dark)" />
+          <img src="./assets/screens/mobile-light.webp" width="390" height="844" loading="lazy" alt="Punchboard on a phone-sized screen." />
+        </picture>
+        <div class="anywhere__copy">
+          <p class="stamp">04 · Anywhere</p>
+          <h2>No install? No problem.</h2>
+          <p>
+            The full app runs in your browser — same time card, same punch clock.
+            Point it at a data file and it autosaves there, so you can pick up
+            the desktop app later without losing a minute.
+          </p>
+          <a class="button button--primary button--large" href="./app/">Open in your browser</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Downloads -->
     <section id="downloads" class="downloads">
       <div class="container">
-        <h2>Download for your desktop</h2>
+        <p class="stamp">05 · Download</p>
+        <h2>Get it on your desktop.</h2>
         <p class="downloads__subtitle">
-          Free and open source. Installed apps check for updates automatically.
-          Current version: <strong data-version>—</strong>
+          Free, open source, MIT licensed. Current version: <strong data-version>—</strong>
         </p>
         <div class="downloads__grid">
-          <a class="download-card" data-platform-card="mac" data-download="mac" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
-            <h3>macOS</h3>
-            <p>Signed &amp; notarized .dmg</p>
+          <a class="ticket" data-platform-card="mac" data-download="mac" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
+            <span class="ticket__os">macOS</span>
+            <span class="ticket__meta">Signed &amp; notarized · .dmg</span>
+            <span class="ticket__alt"><code>brew install --cask quackbyte/tap/punchboard</code></span>
+            <span class="ticket__cta">Download →</span>
           </a>
-          <a class="download-card" data-platform-card="win" data-download="win" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
-            <h3>Windows</h3>
-            <p>.exe installer</p>
+          <a class="ticket" data-platform-card="win" data-download="win" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
+            <span class="ticket__os">Windows</span>
+            <span class="ticket__meta">Installer · .exe</span>
+            <span class="ticket__alt">Windows 10 and 11</span>
+            <span class="ticket__cta">Download →</span>
           </a>
-          <a class="download-card" data-platform-card="linux" data-download="linux" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
-            <h3>Linux</h3>
-            <p>.AppImage</p>
+          <a class="ticket" data-platform-card="linux" data-download="linux" href="https://github.com/QuackByte/punchboard/releases/latest" target="_blank" rel="noopener">
+            <span class="ticket__os">Linux</span>
+            <span class="ticket__meta">Portable · .AppImage</span>
+            <span class="ticket__alt">Most x64 distributions</span>
+            <span class="ticket__cta">Download →</span>
           </a>
         </div>
         <p class="downloads__all">
@@ -160,5 +261,6 @@
   </footer>
 
   <script src="./downloads.js"></script>
+  <script src="./typer.js"></script>
 </body>
 </html>
