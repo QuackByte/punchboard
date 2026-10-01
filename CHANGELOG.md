@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.8.0...punchboard-v1.9.0) (2026-10-01)
+
+
+### Features
+
+* time rules, timesheet export, undo, reminders and punch shortcut ([#35](https://github.com/QuackByte/punchboard/issues/35)) ([86a72c5](https://github.com/QuackByte/punchboard/commit/86a72c583be9a803e7e843be9c952d0ffd45b41e))
+* tray popover, tray/login preferences, and ⌘, for Settings ([#34](https://github.com/QuackByte/punchboard/issues/34)) ([7a50108](https://github.com/QuackByte/punchboard/commit/7a5010809bfd5547018f20d62c7e24d69ec5a6d0))
+
 ## [1.8.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.7.0...punchboard-v1.8.0) (2026-10-01)
 
 
