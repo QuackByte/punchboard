@@ -86,6 +86,10 @@ export default function WorkTracker() {
     reloadBrowserDataFile,
     overwriteBrowserDataFile,
     disconnectBrowserDataFile,
+    startupAvailable,
+    openAtLogin,
+    startupError,
+    changeOpenAtLogin,
   } = tracker;
 
   if (isFileMode && !fileInitialized) {
@@ -221,6 +225,10 @@ export default function WorkTracker() {
           onReloadBrowserFile={reloadBrowserDataFile}
           onOverwriteBrowserFile={overwriteBrowserDataFile}
           onDisconnectBrowserFile={disconnectBrowserDataFile}
+          startupAvailable={startupAvailable}
+          openAtLogin={openAtLogin}
+          startupError={startupError}
+          onOpenAtLoginChange={changeOpenAtLogin}
         />
 
         <main className="space-y-4">

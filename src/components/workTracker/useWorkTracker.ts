@@ -109,6 +109,7 @@ export function useWorkTracker() {
   const [savedMonths, setSavedMonths] = useState<string[]>([]);
   const [lastSavedAt, setLastSavedAt] = useState<string>("");
   const [isMonthHydrated, setIsMonthHydrated] = useState<boolean>(false);
+  const [hydratedMonthKey, setHydratedMonthKey] = useState<string | null>(null);
   const [graphYear, setGraphYear] = useState<number>(initialUiState.graphYear);
 
   const [fileInitialized, setFileInitialized] = useState<boolean>(!isFileMode);
@@ -119,11 +120,51 @@ export function useWorkTracker() {
   const [browserFileNeedsPermission, setBrowserFileNeedsPermission] =
     useState(false);
   const [browserFileError, setBrowserFileError] = useState<string | null>(null);
+  const [startupAvailable, setStartupAvailable] = useState(false);
+  const [openAtLogin, setOpenAtLogin] = useState(false);
+  const [startupError, setStartupError] = useState<string | null>(null);
+  const [trayPunchPending, setTrayPunchPending] = useState(false);
   const [fileLoadVersion, setFileLoadVersion] = useState(0);
   const activeBrowserFileHandleRef =
     useRef<BrowserDataFileHandle | null>(null);
   const browserFileContentsRef = useRef<string | null>(null);
   const browserFileWriteBlockedRef = useRef(false);
+
+  useEffect(() => {
+    if (!window.desktop?.isElectron) return;
+    let active = true;
+    void window.desktop
+      .getStartupConfig()
+      .then((config) => {
+        if (!active) return;
+        setStartupAvailable(config.available);
+        setOpenAtLogin(config.openAtLogin);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setStartupError(
+            error instanceof Error ? error.message : "Could not load startup setting.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const changeOpenAtLogin = useCallback(async (enabled: boolean) => {
+    if (!window.desktop?.isElectron) return;
+    setStartupError(null);
+    try {
+      const result = await window.desktop.setOpenAtLogin(enabled);
+      setOpenAtLogin(result.openAtLogin);
+      setStartupError(result.message ?? null);
+    } catch (error) {
+      setStartupError(
+        error instanceof Error ? error.message : "Could not update startup setting.",
+      );
+    }
+  }, []);
 
   const addActivity = (type: ActivityType, message: string) => {
     const entry: ActivityLogEntry = {
@@ -686,6 +727,7 @@ export function useWorkTracker() {
       setTimeEntries({});
     } finally {
       setIsMonthHydrated(true);
+      setHydratedMonthKey(monthKey);
     }
   }, [monthKey, fileInitialized, fileLoadVersion]);
 
@@ -1392,6 +1434,73 @@ export function useWorkTracker() {
     setDayEntries(todayKey, next);
   };
 
+  const handleTrayPunchToggle = useCallback(() => {
+    if (!fileInitialized) {
+      window.desktop?.showMainWindow();
+      return;
+    }
+    if (openSession?.key === todayKey) {
+      punchOut();
+      return;
+    }
+    if (openSession) {
+      window.desktop?.showMainWindow();
+      return;
+    }
+    if (isViewingCurrentPeriod) {
+      punchIn();
+      return;
+    }
+
+    setMonthKey(currentPeriodMonthKey);
+    setTrayPunchPending(true);
+  }, [
+    currentPeriodMonthKey,
+    fileInitialized,
+    isViewingCurrentPeriod,
+    openSession,
+    punchIn,
+    punchOut,
+    todayKey,
+  ]);
+
+  useEffect(() => {
+    if (!window.desktop?.isElectron) return;
+    return window.desktop.onTrayPunchToggle(handleTrayPunchToggle);
+  }, [handleTrayPunchToggle]);
+
+  useEffect(() => {
+    if (
+      !trayPunchPending ||
+      !isViewingCurrentPeriod ||
+      !isMonthHydrated ||
+      hydratedMonthKey !== currentPeriodMonthKey
+    ) {
+      return;
+    }
+    setTrayPunchPending(false);
+    if (!openSession) punchIn();
+  }, [
+    currentPeriodMonthKey,
+    hydratedMonthKey,
+    isMonthHydrated,
+    isViewingCurrentPeriod,
+    openSession,
+    punchIn,
+    trayPunchPending,
+  ]);
+
+  useEffect(() => {
+    if (!window.desktop?.isElectron) return;
+    window.desktop.updateTrayStatus({
+      ready: fileInitialized,
+      canPunchIn: fileInitialized && !openSession,
+      canPunchOut: fileInitialized && openSession?.key === todayKey,
+      hasStaleSession: !!openSession && openSession.key !== todayKey,
+      sessionStart: openSession?.entry.start ?? null,
+    });
+  }, [fileInitialized, openSession, todayKey]);
+
   const goToCurrentPeriod = () => {
     handleMonthChange(currentPeriodMonthKey);
   };
@@ -1642,5 +1751,9 @@ export function useWorkTracker() {
     reloadBrowserDataFile,
     overwriteBrowserDataFile,
     disconnectBrowserDataFile,
+    startupAvailable,
+    openAtLogin,
+    startupError,
+    changeOpenAtLogin,
   };
 }
