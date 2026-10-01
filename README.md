@@ -10,6 +10,13 @@ easy to sync with iCloud, Dropbox, or any folder you already back up.
 marketing page, or jump straight into the
 [browser app](https://quackbyte.dev/punchboard/app/).
 
+<p align="center">
+  <picture>
+    <source srcset="site/assets/screens/dashboard-dark.webp" media="(prefers-color-scheme: dark)" />
+    <img src="site/assets/screens/dashboard-light.webp" alt="Punchboard dashboard with a running punch clock, hours and payslip summaries, and the monthly time card" width="880" />
+  </picture>
+</p>
+
 ## Features
 
 - **Punch clock** — punch in and out for today with one click; the running
