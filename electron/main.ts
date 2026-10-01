@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater as nativeAutoUpdater,
   BrowserWindow,
   dialog,
   globalShortcut,
@@ -49,6 +50,8 @@ let trayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let trayTitleTimer: NodeJS.Timeout | null = null;
 let isQuitting = false;
+/** Version of an update that has finished downloading, waiting to install. */
+let downloadedUpdateVersion: string | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
 /** Reminders already shown, as "kind:dayKey", so each fires once a day. */
 const firedReminders = new Set<string>();
@@ -67,7 +70,10 @@ let trayStatus: TrayStatus = {
 
 type AutoUpdaterEvents = {
   on(event: "error", listener: (error: Error, message?: string) => void): void;
-  on(event: "update-downloaded", listener: () => void): void;
+  on(
+    event: "update-downloaded",
+    listener: (info: { version: string }) => void,
+  ): void;
 };
 
 type UpdateCheckResult =
@@ -813,6 +819,13 @@ function registerUpdateIpcHandlers() {
       return { status: "error", message: "Updater unavailable." };
     }
 
+    // Checking again would make Squirrel re-download into a new folder and
+    // delete the one already queued for install, so just offer the restart.
+    if (downloadedUpdateVersion) {
+      void promptToInstallUpdate(autoUpdater);
+      return { status: "available", version: downloadedUpdateVersion };
+    }
+
     try {
       const result = await autoUpdater.checkForUpdates();
       const latestVersion = result?.updateInfo?.version;
@@ -911,28 +924,50 @@ function setupAutoUpdates() {
     console.error("Auto-update failed", error);
   });
 
-  updaterEvents.on("update-downloaded", async () => {
+  // quitAndInstall closes every window before quitting. Without this the
+  // close handler would just hide them to the tray and the app would never
+  // quit, so the update never installed.
+  nativeAutoUpdater.on("before-quit-for-update", () => {
+    isQuitting = true;
+  });
+
+  updaterEvents.on("update-downloaded", (info) => {
+    downloadedUpdateVersion = info?.version ?? "new";
+    void promptToInstallUpdate(autoUpdater);
+  });
+
+  void autoUpdater.checkForUpdatesAndNotify();
+  const timer = setInterval(() => {
+    if (downloadedUpdateVersion) return;
+    void autoUpdater.checkForUpdatesAndNotify();
+  }, UPDATE_CHECK_INTERVAL_MS);
+  timer.unref();
+}
+
+let isPromptingForUpdate = false;
+
+async function promptToInstallUpdate(autoUpdater: AppUpdater) {
+  if (isPromptingForUpdate) return;
+  isPromptingForUpdate = true;
+  try {
     const result = await dialog.showMessageBox({
       type: "info",
       title: "Update ready",
       message: "A new version has been downloaded.",
       detail:
-        "Restart now to apply it, or continue working and it will install after you close the app.",
+        "Restart now to apply it, or keep working and it will install the next time you quit Punchboard.",
       buttons: ["Restart now", "Later"],
       defaultId: 0,
       cancelId: 1,
     });
 
     if (result.response === 0) {
+      isQuitting = true;
       autoUpdater.quitAndInstall();
     }
-  });
-
-  void autoUpdater.checkForUpdatesAndNotify();
-  const timer = setInterval(() => {
-    void autoUpdater.checkForUpdatesAndNotify();
-  }, UPDATE_CHECK_INTERVAL_MS);
-  timer.unref();
+  } finally {
+    isPromptingForUpdate = false;
+  }
 }
 
 app.whenReady().then(() => {

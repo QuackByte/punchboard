@@ -39,103 +39,12 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  build-and-upload:
-    name: Build ${{ matrix.platform.name }}
-    needs: release
-    if: needs.release.outputs.release_created == 'true'
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - name: macOS
-            os: macos-latest
-            build_args: --mac dmg zip
-          - name: Windows
-            os: windows-latest
-            build_args: --win nsis
-          - name: Linux
-            os: ubuntu-latest
-            build_args: --linux AppImage
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.release.outputs.tag_name }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Write the App Store Connect API key (.p8) from a base64 secret to a file
-      # and expose its path. electron-builder's notarytool integration reads
-      # APPLE_API_KEY as a *file path*, so it must exist on disk.
-      - name: Prepare App Store Connect API key
-        if: matrix.platform.name == 'macOS'
-        shell: bash
-        env:
-          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8 }}
-        run: |
-          if [ -z "$APPLE_API_KEY_BASE64" ]; then
-            echo "Missing APPLE_API_KEY_P8 Actions secret or repository access."
-            exit 1
-          fi
-          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          echo -n "$APPLE_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
-          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
-
-      # macOS: sign with the Developer ID cert (from the base64 .p12 secret) and
-      # notarize via the App Store Connect API key (Apple's recommended path —
-      # more reliable than the Apple ID + app-specific-password method).
-      - name: Build app (macOS, signed + notarized)
-        if: matrix.platform.name == 'macOS'
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          # APPLE_API_KEY (path) comes from $GITHUB_ENV set in the step above.
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: npm run build && npx electron-builder ${{ matrix.platform.build_args }} --publish never
-
-      # Windows/Linux: no signing. CSC env vars are intentionally left unset —
-      # defining CSC_LINK (even empty) makes electron-builder try to resolve it
-      # as a file and fail (e.g. "Env WIN_CSC_LINK is not correct").
-      - name: Build app (Windows/Linux, unsigned)
-        if: matrix.platform.name != 'macOS'
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run build && npx electron-builder ${{ matrix.platform.build_args }} --publish never
-
-      - name: Verify macOS updater metadata
-        if: matrix.platform.name == 'macOS'
-        shell: bash
-        run: |
-          test -f dist/latest-mac.yml
-          compgen -G "dist/*.zip.blockmap" > /dev/null
-          node -e 'const asar = require("@electron/asar"); const files = asar.listPackage("dist/mac-arm64/Punchboard.app/Contents/Resources/app.asar"); if (!files.includes("/node_modules/builder-util-runtime/out/index.js")) process.exit(1);'
-
-      - name: Upload release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          # Upload app installers and electron-updater metadata, not icons or web assets.
-          files=()
-          while IFS= read -r -d '' file; do
-            files+=("$file")
-          done < <(find dist -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.zip" -o -name "*.yml" -o -name "*.blockmap" \) -print0 | sort -z)
-
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release assets found in dist/"
-            exit 1
-          fi
-
-          gh release upload "${{ needs.release.outputs.tag_name }}" "${files[@]}" --clobber
-
+  # Installers are built once, from the release tag. release-please creates
+  # the tag with RELEASES_TOKEN, and tags pushed with a personal token
+  # trigger this workflow again (ones pushed with github.token don't). If the
+  # token is ever missing, run this workflow manually with the tag name.
+  # Building on the main push as well raced the tag build to upload the same
+  # assets, which failed runs and could mix files from different builds.
   build-tag-release:
     name: Build ${{ matrix.platform.name }} for tag
     if: startsWith(github.ref, 'refs/tags/punchboard-v') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag_name, 'punchboard-v'))
