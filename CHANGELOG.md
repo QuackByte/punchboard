@@ -5,7 +5,6 @@
 
 ### Features
 
-* punch clock, clocked time sessions, and time-card redesign ([f5526b9](https://github.com/QuackByte/punchboard/commit/f5526b93ff501a6190251c7b7ac9b8ef0f4d886f))
 * punch clock, clocked time sessions, and time-card redesign ([af94ea9](https://github.com/QuackByte/punchboard/commit/af94ea9adcfab6a77ff28456e9dd9b5d811a4b5e))
 
 ## [1.6.0](https://github.com/jsanzdev/punchboard/compare/punchboard-v1.5.0...punchboard-v1.6.0) (2026-08-03)
