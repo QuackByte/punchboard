@@ -35,6 +35,30 @@ import {
   safeStorageSetItem,
   sumEntriesHours,
 } from "./utils";
+import {
+  BrowserDataFileHandle,
+  chooseExistingDataFile,
+  chooseNewOrExistingDataFile,
+  forgetDataFile,
+  getRememberedDataFile,
+  hasDataFilePermission,
+  readDataFile,
+  rememberDataFile,
+  supportsBrowserDataFiles,
+  writeDataFile,
+} from "./browserDataFile";
+
+function parseDataFile(raw: string) {
+  const payload = JSON.parse(raw) as DataFile;
+  if (
+    payload.version !== 1 ||
+    !payload.months ||
+    typeof payload.months !== "object"
+  ) {
+    throw new Error("This is not a supported Punchboard data file.");
+  }
+  return payload;
+}
 
 const isFileMode = !!window.fileAPI?.isElectron;
 
@@ -89,6 +113,17 @@ export function useWorkTracker() {
 
   const [fileInitialized, setFileInitialized] = useState<boolean>(!isFileMode);
   const [filePath, setFilePath] = useState<string>("");
+  const browserFileSupported = !isFileMode && supportsBrowserDataFiles();
+  const [browserFileHandle, setBrowserFileHandle] =
+    useState<BrowserDataFileHandle | null>(null);
+  const [browserFileNeedsPermission, setBrowserFileNeedsPermission] =
+    useState(false);
+  const [browserFileError, setBrowserFileError] = useState<string | null>(null);
+  const [fileLoadVersion, setFileLoadVersion] = useState(0);
+  const activeBrowserFileHandleRef =
+    useRef<BrowserDataFileHandle | null>(null);
+  const browserFileContentsRef = useRef<string | null>(null);
+  const browserFileWriteBlockedRef = useRef(false);
 
   const addActivity = (type: ActivityType, message: string) => {
     const entry: ActivityLogEntry = {
@@ -163,7 +198,7 @@ export function useWorkTracker() {
         savedAt: new Date().toISOString(),
         uiState: { monthKey: currentMonthKey, graphYear: currentGraphYear },
         settings: { payslipStartDay: currentPayslipStartDay },
-        savedMonths: currentSavedMonths,
+        savedMonths: allMonths,
         activityLog: currentActivityLog,
         months,
       };
@@ -305,6 +340,55 @@ export function useWorkTracker() {
     },
     [],
   );
+
+  const loadBrowserDataFile = useCallback(
+    (handle: BrowserDataFileHandle, raw: string) => {
+      const payload = parseDataFile(raw);
+      activeBrowserFileHandleRef.current = handle;
+      browserFileContentsRef.current = raw;
+      browserFileWriteBlockedRef.current = false;
+      setBrowserFileHandle(handle);
+      setBrowserFileNeedsPermission(false);
+      setBrowserFileError(null);
+      setIsMonthHydrated(false);
+      initializeFromFile(payload, handle.name);
+      setFileLoadVersion((version) => version + 1);
+    },
+    [initializeFromFile],
+  );
+
+  useEffect(() => {
+    if (!browserFileSupported) return;
+
+    let active = true;
+    void getRememberedDataFile()
+      .then(async (handle) => {
+        if (!active || !handle) return;
+
+        setBrowserFileHandle(handle);
+        setFilePath(handle.name);
+        if (!(await hasDataFilePermission(handle))) {
+          if (active) setBrowserFileNeedsPermission(true);
+          return;
+        }
+
+        const raw = await readDataFile(handle);
+        if (active) loadBrowserDataFile(handle, raw);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setBrowserFileError(
+            error instanceof Error
+              ? error.message
+              : "Could not reopen the shared data file.",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [browserFileSupported, loadBrowserDataFile]);
 
   const tryLoadRememberedFile = useCallback(async () => {
     if (!isFileMode) return;
@@ -603,7 +687,7 @@ export function useWorkTracker() {
     } finally {
       setIsMonthHydrated(true);
     }
-  }, [monthKey, fileInitialized]);
+  }, [monthKey, fileInitialized, fileLoadVersion]);
 
   const currentMonthData = useMemo<TrackerData>(
     () => ({
@@ -640,6 +724,236 @@ export function useWorkTracker() {
     ],
   );
 
+  const connectBrowserDataFile = useCallback(async () => {
+    if (!browserFileSupported) return;
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before changing files.");
+      return;
+    }
+
+    try {
+      const handle = await chooseExistingDataFile();
+      if (!handle) return;
+      if (!(await hasDataFilePermission(handle, true))) {
+        await rememberDataFile(handle);
+        activeBrowserFileHandleRef.current = null;
+        setBrowserFileHandle(handle);
+        setFilePath(handle.name);
+        setBrowserFileNeedsPermission(true);
+        return;
+      }
+
+      const raw = await readDataFile(handle);
+      parseDataFile(raw);
+      if (
+        savedMonths.length > 0 &&
+        !window.confirm(
+          `Load data from ${handle.name} into this browser? This replaces the data currently stored in this browser. Export a backup first if you want to keep it.`,
+        )
+      ) {
+        return;
+      }
+
+      await rememberDataFile(handle);
+      loadBrowserDataFile(handle, raw);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setBrowserFileError(
+        error instanceof Error ? error.message : "Could not open the data file.",
+      );
+    }
+  }, [browserFileSupported, loadBrowserDataFile, savedMonths.length]);
+
+  const saveBrowserDataToFile = useCallback(async () => {
+    if (!browserFileSupported) return;
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before changing files.");
+      return;
+    }
+
+    try {
+      const handle = await chooseNewOrExistingDataFile();
+      if (!(await hasDataFilePermission(handle, true))) {
+        setBrowserFileError(
+          "Write permission was not granted. Select the file again to save browser data.",
+        );
+        return;
+      }
+
+      const existingFile = await handle.getFile();
+      if (
+        existingFile.size > 0 &&
+        !window.confirm(
+          `Replace ${handle.name} with this browser's data? This overwrites the current file contents.`,
+        )
+      ) {
+        return;
+      }
+
+      const payload = buildFilePayload(
+        monthKey,
+        graphYear,
+        payslipStartDay,
+        savedMonths,
+        activityLog,
+        currentMonthData,
+      );
+      const contents = JSON.stringify(payload, null, 2);
+      await writeDataFile(handle, contents);
+      await rememberDataFile(handle);
+      activeBrowserFileHandleRef.current = handle;
+      browserFileContentsRef.current = contents;
+      browserFileWriteBlockedRef.current = false;
+      setBrowserFileHandle(handle);
+      setBrowserFileNeedsPermission(false);
+      setBrowserFileError(null);
+      setFilePath(handle.name);
+      setLastSavedAt(new Date().toISOString());
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setBrowserFileError(
+        error instanceof Error ? error.message : "Could not save to the data file.",
+      );
+    }
+  }, [
+    activityLog,
+    browserFileSupported,
+    buildFilePayload,
+    currentMonthData,
+    graphYear,
+    monthKey,
+    payslipStartDay,
+    savedMonths,
+  ]);
+
+  const reconnectBrowserDataFile = useCallback(async () => {
+    if (!browserFileHandle) return;
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before reconnecting.");
+      return;
+    }
+
+    try {
+      if (!(await hasDataFilePermission(browserFileHandle, true))) {
+        setBrowserFileNeedsPermission(true);
+        return;
+      }
+      const raw = await readDataFile(browserFileHandle);
+      parseDataFile(raw);
+      if (
+        savedMonths.length > 0 &&
+        !window.confirm(
+          `Reload ${browserFileHandle.name}? This replaces the data currently stored in this browser.`,
+        )
+      ) {
+        return;
+      }
+      await rememberDataFile(browserFileHandle);
+      loadBrowserDataFile(browserFileHandle, raw);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setBrowserFileError(
+        error instanceof Error ? error.message : "Could not reconnect the data file.",
+      );
+    }
+  }, [browserFileHandle, loadBrowserDataFile, savedMonths.length]);
+
+  const reloadBrowserDataFile = useCallback(async () => {
+    if (!browserFileHandle) return;
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before reloading.");
+      return;
+    }
+
+    try {
+      const raw = await readDataFile(browserFileHandle);
+      parseDataFile(raw);
+      if (
+        !window.confirm(
+          `Reload ${browserFileHandle.name} and discard the unsaved browser changes?`,
+        )
+      ) {
+        return;
+      }
+      loadBrowserDataFile(browserFileHandle, raw);
+    } catch (error) {
+      setBrowserFileError(
+        error instanceof Error ? error.message : "Could not reload the data file.",
+      );
+    }
+  }, [browserFileHandle, loadBrowserDataFile]);
+
+  const overwriteBrowserDataFile = useCallback(async () => {
+    if (!browserFileHandle) return;
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before overwriting.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Overwrite ${browserFileHandle.name} with this browser's data?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const payload = buildFilePayload(
+        monthKey,
+        graphYear,
+        payslipStartDay,
+        savedMonths,
+        activityLog,
+        currentMonthData,
+      );
+      const contents = JSON.stringify(payload, null, 2);
+      await writeDataFile(browserFileHandle, contents);
+      browserFileContentsRef.current = contents;
+      browserFileWriteBlockedRef.current = false;
+      setBrowserFileError(null);
+      setLastSavedAt(new Date().toISOString());
+    } catch (error) {
+      setBrowserFileNeedsPermission(
+        error instanceof DOMException && error.name === "NotAllowedError",
+      );
+      setBrowserFileError(
+        error instanceof Error ? error.message : "Could not overwrite the data file.",
+      );
+    }
+  }, [
+    activityLog,
+    browserFileHandle,
+    buildFilePayload,
+    currentMonthData,
+    graphYear,
+    monthKey,
+    payslipStartDay,
+    savedMonths,
+  ]);
+
+  const disconnectBrowserDataFile = useCallback(async () => {
+    if (fileWriteInFlightRef.current) {
+      window.alert("Wait for the current autosave to finish before disconnecting.");
+      return;
+    }
+    try {
+      await forgetDataFile();
+      activeBrowserFileHandleRef.current = null;
+      browserFileContentsRef.current = null;
+      browserFileWriteBlockedRef.current = false;
+      setBrowserFileHandle(null);
+      setBrowserFileNeedsPermission(false);
+      setBrowserFileError(null);
+      setFilePath("");
+    } catch (error) {
+      setBrowserFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not disconnect the selected file.",
+      );
+    }
+  }, []);
+
   useEffect(() => {
     if (!isMonthHydrated) {
       return;
@@ -660,7 +974,16 @@ export function useWorkTracker() {
   }, [currentMonthData, monthKey, isMonthHydrated]);
 
   useEffect(() => {
-    if (!isFileMode || !fileInitialized || !isMonthHydrated) return;
+    if (
+      (!isFileMode &&
+        (!browserFileHandle ||
+          browserFileNeedsPermission ||
+          browserFileWriteBlockedRef.current)) ||
+      !fileInitialized ||
+      !isMonthHydrated
+    ) {
+      return;
+    }
 
     const payload = buildFilePayload(
       monthKey,
@@ -682,12 +1005,64 @@ export function useWorkTracker() {
         fileWriteInFlightRef.current = false;
         return;
       }
+      if (!isFileMode && browserFileWriteBlockedRef.current) {
+        pendingFilePayloadRef.current = null;
+        fileWriteInFlightRef.current = false;
+        return;
+      }
       pendingFilePayloadRef.current = null;
       fileWriteInFlightRef.current = true;
-      void window.fileAPI!.writeFile(next).finally(flush);
+      void (async () => {
+        try {
+          if (isFileMode) {
+            const written = await window.fileAPI!.writeFile(next);
+            if (!written) throw new Error("Could not write the desktop data file.");
+          } else {
+            const handle = activeBrowserFileHandleRef.current;
+            if (!handle) {
+              pendingFilePayloadRef.current = null;
+              return;
+            }
+            const currentContents = await readDataFile(handle);
+            if (activeBrowserFileHandleRef.current !== handle) return;
+            if (
+              browserFileContentsRef.current !== null &&
+              currentContents !== browserFileContentsRef.current
+            ) {
+              browserFileWriteBlockedRef.current = true;
+              setBrowserFileError(
+                "This file changed outside the browser. Reload it or explicitly overwrite it to continue syncing.",
+              );
+              return;
+            }
+            await writeDataFile(handle, next);
+            if (activeBrowserFileHandleRef.current === handle) {
+              browserFileContentsRef.current = next;
+              setBrowserFileError(null);
+            }
+          }
+          setLastSavedAt(new Date().toISOString());
+        } catch (error) {
+          if (!isFileMode) {
+            browserFileWriteBlockedRef.current = true;
+            setBrowserFileNeedsPermission(
+              error instanceof DOMException && error.name === "NotAllowedError",
+            );
+            setBrowserFileError(
+              error instanceof Error
+                ? error.message
+                : "Could not autosave the shared data file.",
+            );
+          }
+        } finally {
+          flush();
+        }
+      })();
     };
     flush();
   }, [
+    browserFileHandle,
+    browserFileNeedsPermission,
     fileInitialized,
     isMonthHydrated,
     currentMonthData,
@@ -1149,25 +1524,35 @@ export function useWorkTracker() {
   const importData = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const payload = JSON.parse(text) as DataFile;
+      void (async () => {
+        try {
+          const text = event.target?.result as string;
+          const payload = parseDataFile(text);
 
-        if (payload.version !== 1) {
-          alert("Unsupported backup format version.");
-          return;
+          if (isFileMode) {
+            initializeFromFile(payload, filePath);
+          } else if (browserFileHandle) {
+            if (
+              !window.confirm(
+                `Restore this backup to ${browserFileHandle.name}? It will replace the shared file contents.`,
+              )
+            ) {
+              return;
+            }
+            const contents = JSON.stringify(payload, null, 2);
+            await writeDataFile(browserFileHandle, contents);
+            loadBrowserDataFile(browserFileHandle, contents);
+          } else {
+            populateLocalStorageFromFile(payload);
+            window.location.reload();
+          }
+        } catch (error) {
+          setBrowserFileError(
+            error instanceof Error ? error.message : "Failed to import the backup.",
+          );
+          alert("Failed to import: the file is not a valid backup.");
         }
-
-        populateLocalStorageFromFile(payload);
-
-        if (isFileMode) {
-          initializeFromFile(payload, filePath);
-        } else {
-          window.location.reload();
-        }
-      } catch {
-        alert("Failed to import: the file is not a valid backup.");
-      }
+      })();
     };
     reader.readAsText(file);
   };
@@ -1242,10 +1627,20 @@ export function useWorkTracker() {
     exportData,
     importData,
     isFileMode,
+    browserFileSupported,
+    browserFileHandle,
+    browserFileNeedsPermission,
+    browserFileError,
     fileInitialized,
     filePath,
     chooseExistingFile,
     createNewFile,
     changeFile,
+    connectBrowserDataFile,
+    saveBrowserDataToFile,
+    reconnectBrowserDataFile,
+    reloadBrowserDataFile,
+    overwriteBrowserDataFile,
+    disconnectBrowserDataFile,
   };
 }

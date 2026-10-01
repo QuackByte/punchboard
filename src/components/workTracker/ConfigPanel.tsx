@@ -61,6 +61,16 @@ interface ConfigPanelProps {
   isFileMode: boolean;
   filePath: string;
   onChangeFile: () => void;
+  browserFileSupported: boolean;
+  hasBrowserFile: boolean;
+  browserFileNeedsPermission: boolean;
+  browserFileError: string | null;
+  onConnectBrowserFile: () => void;
+  onSaveBrowserDataToFile: () => void;
+  onReconnectBrowserFile: () => void;
+  onReloadBrowserFile: () => void;
+  onOverwriteBrowserFile: () => void;
+  onDisconnectBrowserFile: () => void;
 }
 
 function Section({
@@ -142,6 +152,16 @@ export default function ConfigPanel({
   isFileMode,
   filePath,
   onChangeFile,
+  browserFileSupported,
+  hasBrowserFile,
+  browserFileNeedsPermission,
+  browserFileError,
+  onConnectBrowserFile,
+  onSaveBrowserDataToFile,
+  onReconnectBrowserFile,
+  onReloadBrowserFile,
+  onOverwriteBrowserFile,
+  onDisconnectBrowserFile,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -190,16 +210,20 @@ export default function ConfigPanel({
 
         <Section title="File" first>
           <p className="text-xs text-muted-foreground">
-            {isFileMode ? (
+            {isFileMode || hasBrowserFile ? (
               <>
                 <span className="block truncate" title={filePath}>
                   📁 {filePath || "No file chosen"}
                 </span>
-                <span>
-                  Months saved: {savedMonthsCount} | Last save:{" "}
-                  {lastSavedAt
-                    ? new Date(lastSavedAt).toLocaleString()
-                    : "not yet"}
+                <span className="block">
+                  {browserFileNeedsPermission
+                    ? "Browser permission is needed to resume autosaving."
+                    : browserFileError ??
+                      `Months saved: ${savedMonthsCount} | Last save: ${
+                        lastSavedAt
+                          ? new Date(lastSavedAt).toLocaleString()
+                          : "not yet"
+                      }`}
                 </span>
               </>
             ) : (
@@ -212,33 +236,127 @@ export default function ConfigPanel({
             )}
           </p>
 
-          <div className="flex gap-2">
-            {isFileMode && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={onChangeFile}
-              >
-                Change file
-              </Button>
+          {!isFileMode && hasBrowserFile && !browserFileError ? (
+            <p className="text-xs text-muted-foreground">
+              Changes autosave to this file. Use one app at a time; external
+              edits are detected and paused to avoid overwriting them.
+            </p>
+          ) : null}
+
+          {!isFileMode && !hasBrowserFile && browserFileError ? (
+            <p className="text-xs text-destructive">{browserFileError}</p>
+          ) : null}
+
+          <div className="space-y-2">
+            {isFileMode ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={onChangeFile}
+                >
+                  Change file
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={onExportData}
+                >
+                  Save backup copy
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={handleImportClick}
+                >
+                  Restore backup
+                </Button>
+              </div>
+            ) : (
+              <>
+                {browserFileSupported && hasBrowserFile ? (
+                  <div className="flex gap-2">
+                    {browserFileNeedsPermission ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={onReconnectBrowserFile}
+                      >
+                        Reconnect file
+                      </Button>
+                    ) : browserFileError ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={onReloadBrowserFile}
+                        >
+                          Reload file
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={onOverwriteBrowserFile}
+                        >
+                          Overwrite file
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={onConnectBrowserFile}
+                        >
+                          Change file
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={onConnectBrowserFile}
+                        >
+                          Change file
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={onDisconnectBrowserFile}
+                        >
+                          Disconnect
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={onExportData}
+                  >
+                    {hasBrowserFile ? "Save backup copy" : "Export backup"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={handleImportClick}
+                  >
+                    {hasBrowserFile ? "Restore backup" : "Import backup"}
+                  </Button>
+                </div>
+              </>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs"
-              onClick={onExportData}
-            >
-              {isFileMode ? "Save backup copy" : "Export backup"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs"
-              onClick={handleImportClick}
-            >
-              {isFileMode ? "Restore backup" : "Import backup"}
-            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -247,6 +365,40 @@ export default function ConfigPanel({
               onChange={handleFileChange}
             />
           </div>
+
+          {!isFileMode && browserFileSupported && !hasBrowserFile ? (
+            <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">
+                Web data currently autosaves in this browser. Select the same
+                JSON file used by the desktop app to share changes between them.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={onConnectBrowserFile}
+                >
+                  Open shared file
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={onSaveBrowserDataToFile}
+                >
+                  Save web data to file
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {!isFileMode && !browserFileSupported ? (
+            <p className="text-xs text-muted-foreground">
+              Web data autosaves in this browser. Shared-file autosave requires
+              a browser that supports local file access, such as Chrome or Edge.
+            </p>
+          ) : null}
 
           {isFileMode ? (
             <div>
