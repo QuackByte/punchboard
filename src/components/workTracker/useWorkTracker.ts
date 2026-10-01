@@ -131,9 +131,11 @@ export function useWorkTracker() {
   const browserFileWriteBlockedRef = useRef(false);
 
   useEffect(() => {
-    if (!window.desktop?.isElectron) return;
+    const desktop = window.desktop;
+    if (!desktop?.isElectron) return;
     let active = true;
-    void window.desktop
+    const unsubscribe = desktop.onOpenAtLoginChanged(setOpenAtLogin);
+    void desktop
       .getStartupConfig()
       .then((config) => {
         if (!active) return;
@@ -149,6 +151,7 @@ export function useWorkTracker() {
       });
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 

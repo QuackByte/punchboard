@@ -112,6 +112,7 @@ function setOpenAtLogin(enabled: boolean) {
     });
     const openAtLogin = app.getLoginItemSettings().openAtLogin;
     updateTrayMenu();
+    mainWindow?.webContents.send("startup:changed", openAtLogin);
     return { success: openAtLogin === enabled, openAtLogin };
   } catch (error) {
     return {
@@ -197,7 +198,16 @@ function createTray() {
   if (tray) return;
 
   try {
-    const trayIcon = loadAppIcon(getAppIconPath()).resize({ width: 16, height: 16 });
+    const trayIcon =
+      process.platform === "darwin"
+        ? nativeImage
+            .createFromDataURL(
+              `data:image/svg+xml;base64,${Buffer.from(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="#000" stroke-width="1.7"/><path d="M9 4.5v4.8l3.1 1.8" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>',
+              ).toString("base64")}`,
+            )
+            .resize({ width: 18, height: 18 })
+        : loadAppIcon(getAppIconPath()).resize({ width: 16, height: 16 });
     if (process.platform === "darwin") trayIcon.setTemplateImage(true);
     tray = new Tray(trayIcon);
     tray.on("double-click", showMainWindow);

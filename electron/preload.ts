@@ -13,6 +13,11 @@ contextBridge.exposeInMainWorld("desktop", {
     ipcRenderer.on("tray:punch-toggle", handler);
     return () => ipcRenderer.removeListener("tray:punch-toggle", handler);
   },
+  onOpenAtLoginChanged: (listener: (enabled: boolean) => void) => {
+    const handler = (_event: unknown, enabled: boolean) => listener(enabled);
+    ipcRenderer.on("startup:changed", handler);
+    return () => ipcRenderer.removeListener("startup:changed", handler);
+  },
   updateTrayStatus: (status: unknown) => {
     ipcRenderer.send("tray:update-status", status);
   },
