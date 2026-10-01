@@ -12,6 +12,7 @@ import {
   TimeEntry,
   TrackerData,
   TrackerSettings,
+  WorkRules,
   TrackerUiState,
   UI_STATE_KEY,
   weekdayMap,
@@ -27,13 +28,13 @@ import {
   getCurrentPayslipEndMonthKey,
   getDatesInPayslipRange,
   getInitialUiState,
+  keyToDate,
   minutesSinceMidnight,
   parseDayInput,
   parseMonthKey,
   safeStorageGetItem,
   safeStorageRemoveItem,
   safeStorageSetItem,
-  sumEntriesHours,
 } from "./utils";
 import {
   BrowserDataFileHandle,
@@ -47,6 +48,50 @@ import {
   supportsBrowserDataFiles,
   writeDataFile,
 } from "./browserDataFile";
+import {
+  computePay,
+  computePeriod,
+  DEFAULT_WORK_RULES,
+  normalizeWorkRules,
+  workedTime,
+} from "./calculations";
+import { useUndo } from "./useUndo";
+
+/** Sets or removes a key so restoring "nothing" really removes it. */
+function withKey<T>(record: Record<string, T>, key: string, value: T | undefined) {
+  if (value === undefined) {
+    const { [key]: _removed, ...rest } = record;
+    return rest;
+  }
+  return { ...record, [key]: value };
+}
+
+/**
+ * Settings are read when state is created rather than in an effect: the
+ * save effect would otherwise write the defaults back first (StrictMode
+ * runs effects twice in development, which made that stick).
+ */
+function readStoredSettings() {
+  try {
+    const raw = safeStorageGetItem(SETTINGS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<TrackerSettings>) : {};
+    return {
+      payslipStartDay: clampDay(parsed.payslipStartDay ?? 21),
+      workRules: normalizeWorkRules(parsed),
+    };
+  } catch {
+    safeStorageRemoveItem(SETTINGS_KEY);
+    return { payslipStartDay: 21, workRules: DEFAULT_WORK_RULES };
+  }
+}
+
+function describeDay(key: string) {
+  return keyToDate(key).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
 
 function parseDataFile(raw: string) {
   const payload = JSON.parse(raw) as DataFile;
@@ -95,7 +140,17 @@ export function useWorkTracker() {
     useState<boolean>(DEFAULT_CURRENCY_CONVERSION_ENABLED);
   const [taxPercent, setTaxPercent] = useState<number>(0);
   const [extraDeduction, setExtraDeduction] = useState<number>(0);
-  const [payslipStartDay, setPayslipStartDay] = useState<number>(21);
+  const [storedSettings] = useState(readStoredSettings);
+  const [payslipStartDay, setPayslipStartDay] = useState<number>(
+    storedSettings.payslipStartDay,
+  );
+  const [workRules, setWorkRules] = useState<WorkRules>(
+    storedSettings.workRules,
+  );
+  const trackerSettings = useMemo<TrackerSettings>(
+    () => ({ payslipStartDay, ...workRules }),
+    [payslipStartDay, workRules],
+  );
   const [defaultHours, setDefaultHours] = useState<number>(8);
   const [exceptions, setExceptions] = useState<Record<string, ExceptionType>>(
     {},
@@ -120,69 +175,12 @@ export function useWorkTracker() {
   const [browserFileNeedsPermission, setBrowserFileNeedsPermission] =
     useState(false);
   const [browserFileError, setBrowserFileError] = useState<string | null>(null);
-  const [startupAvailable, setStartupAvailable] = useState(false);
-  const [openAtLogin, setOpenAtLogin] = useState(false);
-  const [showTray, setShowTray] = useState(true);
-  const [startupError, setStartupError] = useState<string | null>(null);
   const [trayPunchPending, setTrayPunchPending] = useState(false);
   const [fileLoadVersion, setFileLoadVersion] = useState(0);
   const activeBrowserFileHandleRef =
     useRef<BrowserDataFileHandle | null>(null);
   const browserFileContentsRef = useRef<string | null>(null);
   const browserFileWriteBlockedRef = useRef(false);
-
-  useEffect(() => {
-    const desktop = window.desktop;
-    if (!desktop?.isElectron) return;
-    let active = true;
-    const unsubscribe = desktop.onOpenAtLoginChanged(setOpenAtLogin);
-    void desktop
-      .getStartupConfig()
-      .then((config) => {
-        if (!active) return;
-        setStartupAvailable(config.available);
-        setOpenAtLogin(config.openAtLogin);
-        setShowTray(config.showTray);
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setStartupError(
-            error instanceof Error ? error.message : "Could not load startup setting.",
-          );
-        }
-      });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
-
-  const changeOpenAtLogin = useCallback(async (enabled: boolean) => {
-    if (!window.desktop?.isElectron) return;
-    setStartupError(null);
-    try {
-      const result = await window.desktop.setOpenAtLogin(enabled);
-      setOpenAtLogin(result.openAtLogin);
-      setStartupError(result.message ?? null);
-    } catch (error) {
-      setStartupError(
-        error instanceof Error ? error.message : "Could not update startup setting.",
-      );
-    }
-  }, []);
-
-  const changeShowTray = useCallback(async (enabled: boolean) => {
-    if (!window.desktop?.isElectron) return;
-    setStartupError(null);
-    try {
-      const result = await window.desktop.setShowTray(enabled);
-      setShowTray(result.showTray);
-    } catch (error) {
-      setStartupError(
-        error instanceof Error ? error.message : "Could not update the tray setting.",
-      );
-    }
-  }, []);
 
   const addActivity = (type: ActivityType, message: string) => {
     const entry: ActivityLogEntry = {
@@ -227,7 +225,7 @@ export function useWorkTracker() {
     (
       currentMonthKey: string,
       currentGraphYear: number,
-      currentPayslipStartDay: number,
+      currentSettings: TrackerSettings,
       currentSavedMonths: string[],
       currentActivityLog: ActivityLogEntry[],
       currentMonthData: TrackerData,
@@ -256,7 +254,7 @@ export function useWorkTracker() {
         version: 1,
         savedAt: new Date().toISOString(),
         uiState: { monthKey: currentMonthKey, graphYear: currentGraphYear },
-        settings: { payslipStartDay: currentPayslipStartDay },
+        settings: currentSettings,
         savedMonths: allMonths,
         activityLog: currentActivityLog,
         months,
@@ -382,6 +380,7 @@ export function useWorkTracker() {
 
       if (payload.settings) {
         setPayslipStartDay(clampDay(payload.settings.payslipStartDay ?? 21));
+        setWorkRules(normalizeWorkRules(payload.settings));
       }
       if (payload.uiState) {
         setMonthKey(payload.uiState.monthKey);
@@ -489,13 +488,13 @@ export function useWorkTracker() {
       version: 1,
       savedAt: new Date().toISOString(),
       uiState: { monthKey, graphYear },
-      settings: { payslipStartDay },
+      settings: trackerSettings,
       savedMonths: [],
       activityLog: [],
       months: {},
     };
     initializeFromFile(emptyPayload, path);
-  }, [monthKey, graphYear, payslipStartDay, initializeFromFile]);
+  }, [monthKey, graphYear, trackerSettings, initializeFromFile]);
 
   const createNewFile = useCallback(async () => {
     const path = await window.fileAPI!.saveDialog();
@@ -505,14 +504,14 @@ export function useWorkTracker() {
       version: 1,
       savedAt: new Date().toISOString(),
       uiState: { monthKey, graphYear },
-      settings: { payslipStartDay },
+      settings: trackerSettings,
       savedMonths: [],
       activityLog: [],
       months: {},
     };
     await window.fileAPI!.writeFile(JSON.stringify(emptyPayload, null, 2));
     initializeFromFile(emptyPayload, path);
-  }, [monthKey, graphYear, payslipStartDay, initializeFromFile]);
+  }, [monthKey, graphYear, trackerSettings, initializeFromFile]);
 
   const changeFile = useCallback(async () => {
     setFileInitialized(false);
@@ -614,16 +613,6 @@ export function useWorkTracker() {
   useEffect(() => {
     if (isFileMode) return;
 
-    const rawSettings = safeStorageGetItem(SETTINGS_KEY);
-    if (rawSettings) {
-      try {
-        const parsed = JSON.parse(rawSettings) as Partial<TrackerSettings>;
-        setPayslipStartDay(clampDay(parsed.payslipStartDay ?? 21));
-      } catch {
-        safeStorageRemoveItem(SETTINGS_KEY);
-      }
-    }
-
     const rawLog = safeStorageGetItem(ACTIVITY_LOG_KEY);
     if (rawLog) {
       try {
@@ -648,9 +637,9 @@ export function useWorkTracker() {
   useEffect(() => {
     safeStorageSetItem(
       SETTINGS_KEY,
-      JSON.stringify({ payslipStartDay } satisfies TrackerSettings),
+      JSON.stringify(trackerSettings),
     );
-  }, [payslipStartDay]);
+  }, [trackerSettings]);
 
   useEffect(() => {
     safeStorageSetItem(ACTIVITY_LOG_KEY, JSON.stringify(activityLog));
@@ -853,7 +842,7 @@ export function useWorkTracker() {
       const payload = buildFilePayload(
         monthKey,
         graphYear,
-        payslipStartDay,
+        trackerSettings,
         savedMonths,
         activityLog,
         currentMonthData,
@@ -883,6 +872,7 @@ export function useWorkTracker() {
     graphYear,
     monthKey,
     payslipStartDay,
+    trackerSettings,
     savedMonths,
   ]);
 
@@ -961,7 +951,7 @@ export function useWorkTracker() {
       const payload = buildFilePayload(
         monthKey,
         graphYear,
-        payslipStartDay,
+        trackerSettings,
         savedMonths,
         activityLog,
         currentMonthData,
@@ -988,6 +978,7 @@ export function useWorkTracker() {
     graphYear,
     monthKey,
     payslipStartDay,
+    trackerSettings,
     savedMonths,
   ]);
 
@@ -1048,7 +1039,7 @@ export function useWorkTracker() {
     const payload = buildFilePayload(
       monthKey,
       graphYear,
-      payslipStartDay,
+      trackerSettings,
       savedMonths,
       activityLog,
       currentMonthData,
@@ -1129,140 +1120,101 @@ export function useWorkTracker() {
     monthKey,
     graphYear,
     payslipStartDay,
+    trackerSettings,
     savedMonths,
     activityLog,
     buildFilePayload,
   ]);
 
-  const workingDates = useMemo(() => {
-    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
-    return rangeDates.filter((date) =>
-      selectedDays.includes(weekdayMap[date.getDay()]),
-    );
-  }, [monthKey, payslipStartDay, selectedDays]);
-
-  const exceptionSummary = useMemo(() => {
-    let vacationDays = 0;
-    let sickDays = 0;
-
-    workingDates.forEach((date) => {
-      const key = dateKey(date);
-      if (exceptions[key] === "vacation") {
-        vacationDays += 1;
-      }
-      if (exceptions[key] === "sick") {
-        sickDays += 1;
-      }
-    });
-
-    return { workingDaysCount: workingDates.length, vacationDays, sickDays };
-  }, [workingDates, exceptions]);
-
-  const workingDateLookup = useMemo(() => {
-    const lookup = new Set<string>();
-    workingDates.forEach((date) => {
-      lookup.add(dateKey(date));
-    });
-    return lookup;
-  }, [workingDates]);
-
-  const payslipDateLookup = useMemo(() => {
-    const lookup = new Set<string>();
-    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
-    rangeDates.forEach((date) => {
-      lookup.add(dateKey(date));
-    });
-    return lookup;
-  }, [monthKey, payslipStartDay]);
-
-  const extraHoursTotal = useMemo(() => {
-    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
-    return rangeDates.reduce((total, date) => {
-      const key = dateKey(date);
-      if (workingDateLookup.has(key)) {
-        return total;
-      }
-      return total + clampHours(extraHours[key] ?? 0);
-    }, 0);
-  }, [monthKey, payslipStartDay, workingDateLookup, extraHours]);
-
-  const actualHours = useMemo(
+  const period = useMemo(
     () =>
-      workingDates.reduce((total, date) => {
-        const key = dateKey(date);
-        if (exceptions[key] === "sick") {
-          return total;
-        }
-        if (exceptions[key] === "vacation") {
-          const manualHours = dailyHours[key] ?? 0;
-          return total + defaultHours + clampHours(manualHours);
-        }
-        const dayHours = dailyHours[key] ?? hoursPerDay;
-        return total + clampHours(dayHours);
-      }, extraHoursTotal),
-    [
-      workingDates,
-      exceptions,
-      dailyHours,
-      hoursPerDay,
-      defaultHours,
-      extraHoursTotal,
-    ],
+      computePeriod(
+        currentMonthData,
+        monthKey,
+        payslipStartDay,
+        workRules,
+      ),
+    [currentMonthData, monthKey, payslipStartDay, workRules],
   );
 
-  const dailyActualHours = useMemo(() => {
-    const map: Record<string, number> = {};
+  const exceptionSummary = {
+    workingDaysCount: period.workingDaysCount,
+    vacationDays: period.vacationDays,
+    sickDays: period.sickDays,
+  };
 
-    workingDates.forEach((date) => {
-      const key = dateKey(date);
-      if (exceptions[key] === "sick") {
-        map[key] = 0;
-        return;
-      }
-      if (exceptions[key] === "vacation") {
-        const manualHours = dailyHours[key] ?? 0;
-        map[key] = defaultHours + clampHours(manualHours);
-        return;
-      }
-      map[key] = clampHours(dailyHours[key] ?? hoursPerDay);
-    });
+  const workingDateLookup = useMemo(
+    () =>
+      new Set(period.days.filter((day) => day.isWorkingDay).map((day) => day.key)),
+    [period],
+  );
 
-    const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
-    rangeDates.forEach((date) => {
-      const key = dateKey(date);
-      if (workingDateLookup.has(key)) {
-        return;
-      }
-      map[key] = clampHours(extraHours[key] ?? 0);
-    });
+  const payslipDateLookup = useMemo(
+    () => new Set(period.days.map((day) => day.key)),
+    [period],
+  );
 
-    return map;
-  }, [
-    workingDates,
-    exceptions,
-    dailyHours,
-    hoursPerDay,
-    defaultHours,
-    monthKey,
-    payslipStartDay,
-    workingDateLookup,
-    extraHours,
-  ]);
+  const dailyActualHours = useMemo(
+    () =>
+      Object.fromEntries(period.days.map((day) => [day.key, day.hours])),
+    [period],
+  );
 
-  const estimatedHours = workingDates.length * hoursPerDay;
-  const grossSalary = actualHours * hourlyRate;
-  const taxAmount = grossSalary * (clampPercent(taxPercent) / 100);
-  const extraDeductionAmount = Math.max(0, extraDeduction);
-  const netSalary = Math.max(0, grossSalary - taxAmount - extraDeductionAmount);
+  const { actualHours, estimatedHours, extraHoursTotal } = period;
+  const pay = computePay(period, {
+    hourlyRate,
+    taxPercent,
+    extraDeduction,
+    overtimeMultiplier: workRules.overtimeMultiplier,
+  });
+  const grossSalary = pay.gross;
+  const taxAmount = pay.tax;
+  const extraDeductionAmount = pay.deductions;
+  const netSalary = pay.net;
   const convertedGrossSalary = grossSalary * conversionRate;
   const convertedNetSalary = netSalary * conversionRate;
   const convertedTaxAmount = taxAmount * conversionRate;
   const convertedExtraDeductionAmount = extraDeductionAmount * conversionRate;
 
+  const onWorkRulesChange = (patch: Partial<WorkRules>) => {
+    setWorkRules((previous) => normalizeWorkRules({ ...previous, ...patch }));
+    addActivity(
+      "value-change",
+      `Updated ${Object.keys(patch).join(", ")}`,
+    );
+  };
+
+  const { undoOffer, offerUndo, undo, dismissUndo } = useUndo();
+
+  // Undo restores into the loaded month, so an offer can't outlive it.
+  useEffect(() => {
+    dismissUndo();
+  }, [monthKey, dismissUndo]);
+
+  /** Captures everything stored for a day and returns a function restoring it. */
+  const snapshotDay = (key: string) => {
+    const snapshot = {
+      entries: timeEntries[key],
+      daily: dailyHours[key],
+      extra: extraHours[key],
+      exception: exceptions[key],
+    };
+    const isEmpty = Object.values(snapshot).every((value) => value === undefined);
+    const restore = () => {
+      setTimeEntries((previous) => withKey(previous, key, snapshot.entries));
+      setDailyHours((previous) => withKey(previous, key, snapshot.daily));
+      setExtraHours((previous) => withKey(previous, key, snapshot.extra));
+      setExceptions((previous) => withKey(previous, key, snapshot.exception));
+      addActivity("hours-change", `Undid change on ${key}`);
+    };
+    return { isEmpty, restore };
+  };
+
   const setDayException = (key: string, type: ExceptionType | "none") => {
     if (!workingDateLookup.has(key)) {
       return;
     }
+    const { restore } = snapshotDay(key);
 
     // Logged outside the state updater so StrictMode's double-invoke
     // doesn't record the change twice.
@@ -1279,6 +1231,12 @@ export function useWorkTracker() {
     addActivity(
       "exception-change",
       clearing ? `Cleared mark on ${key}` : `Marked ${key} as ${type}`,
+    );
+    offerUndo(
+      clearing
+        ? `Cleared ${describeDay(key)}`
+        : `${describeDay(key)} marked ${type}`,
+      restore,
     );
   };
 
@@ -1321,7 +1279,7 @@ export function useWorkTracker() {
     // Not re-sorted here: the day editor edits rows in place, and reordering
     // while someone is typing a time would shuffle the focused row.
     const sorted = entries;
-    const hours = clampHours(sumEntriesHours(sorted));
+    const hours = clampHours(workedTime(sorted, workRules).workedMinutes / 60);
 
     setTimeEntries((previous) => {
       if (sorted.length === 0) {
@@ -1376,6 +1334,7 @@ export function useWorkTracker() {
 
   /** Drops any override so a workday falls back to the scheduled hours. */
   const resetDay = (key: string) => {
+    const { isEmpty, restore } = snapshotDay(key);
     setTimeEntries((previous) => {
       const { [key]: _removed, ...rest } = previous;
       return rest;
@@ -1389,6 +1348,32 @@ export function useWorkTracker() {
       return rest;
     });
     addActivity("hours-change", `Reset ${key} to schedule`);
+    if (!isEmpty) {
+      offerUndo(
+        workingDateLookup.has(key)
+          ? `${describeDay(key)} reset to schedule`
+          : `${describeDay(key)} cleared`,
+        restore,
+      );
+    }
+  };
+
+  /** Deletes one session from a day, with undo. */
+  const removeSession = (key: string, index: number) => {
+    const entries = timeEntries[key] ?? [];
+    const removed = entries[index];
+    if (!removed) {
+      return;
+    }
+    const { restore } = snapshotDay(key);
+    setDayEntries(
+      key,
+      entries.filter((_, i) => i !== index),
+    );
+    offerUndo(
+      `Removed ${removed.start}–${removed.end ?? "now"} on ${describeDay(key)}`,
+      restore,
+    );
   };
 
   /**
@@ -1400,10 +1385,14 @@ export function useWorkTracker() {
     if (!parsed) {
       return false;
     }
+    const { isEmpty, restore } = snapshotDay(key);
     if (parsed.kind === "sessions") {
       setDayEntries(key, parsed.entries);
     } else {
       setDayTotal(key, parsed.hours);
+    }
+    if (!isEmpty) {
+      offerUndo(`${describeDay(key)} replaced`, restore);
     }
     return true;
   };
@@ -1612,49 +1601,25 @@ export function useWorkTracker() {
       }
 
       const dataStr = safeStorageGetItem(`tracker-${mKey}`);
-
+      let monthHours = 0;
       if (dataStr) {
         try {
-          const data: TrackerData = JSON.parse(dataStr);
-          const rangeDates = getDatesInPayslipRange(mKey, payslipStartDay);
-
-          let totalActualHours = 0;
-          rangeDates.forEach((date) => {
-            const key = dateKey(date);
-            const isWorkingDay = data.selectedDays.includes(
-              weekdayMap[date.getDay()] as DayKey,
-            );
-
-            if (isWorkingDay && data.exceptions[key] !== "sick") {
-              if (data.exceptions[key] === "vacation") {
-                const manualHours = data.dailyHours[key] ?? 0;
-                totalActualHours +=
-                  (data.defaultHours ?? DEFAULT_DEFAULT_HOURS) +
-                  clampHours(manualHours);
-              } else {
-                const hours = data.dailyHours[key] ?? data.hoursPerDay;
-                totalActualHours += clampHours(hours);
-              }
-            } else if (!isWorkingDay) {
-              totalActualHours += clampHours(data.extraHours?.[key] ?? 0);
-            }
-          });
-
-          monthsData.push({
-            month: monthName,
-            monthKey: mKey,
-            actualHours: totalActualHours,
-          });
+          const data = JSON.parse(dataStr) as TrackerData;
+          monthHours = computePeriod(
+            data,
+            mKey,
+            payslipStartDay,
+            workRules,
+          ).actualHours;
         } catch {
-          monthsData.push({ month: monthName, monthKey: mKey, actualHours: 0 });
+          monthHours = 0;
         }
-      } else {
-        monthsData.push({ month: monthName, monthKey: mKey, actualHours: 0 });
       }
+      monthsData.push({ month: monthName, monthKey: mKey, actualHours: monthHours });
     }
 
     return monthsData;
-  }, [graphYear, monthKey, actualHours, payslipStartDay]);
+  }, [graphYear, monthKey, actualHours, payslipStartDay, workRules]);
 
   const calendarCells = useMemo(() => {
     const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
@@ -1698,7 +1663,7 @@ export function useWorkTracker() {
     const payload = buildFilePayload(
       monthKey,
       graphYear,
-      payslipStartDay,
+      trackerSettings,
       savedMonths,
       activityLog,
       currentMonthData,
@@ -1836,11 +1801,13 @@ export function useWorkTracker() {
     reloadBrowserDataFile,
     overwriteBrowserDataFile,
     disconnectBrowserDataFile,
-    startupAvailable,
-    openAtLogin,
-    startupError,
-    changeOpenAtLogin,
-    showTray,
-    changeShowTray,
+    period,
+    pay,
+    workRules,
+    onWorkRulesChange,
+    removeSession,
+    undoOffer,
+    undo,
+    dismissUndo,
   };
 }

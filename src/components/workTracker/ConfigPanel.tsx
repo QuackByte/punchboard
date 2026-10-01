@@ -18,11 +18,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import type { DesktopPreferences, ReminderPreferences } from "@/electron.d";
 import { cn } from "@/lib/utils";
 import {
   ActivityLogEntry,
   CurrencyCode,
   DayKey,
+  WorkRules,
   currencyOptions,
   daysOfWeek,
 } from "./types";
@@ -77,7 +79,16 @@ interface ConfigPanelProps {
   onOpenAtLoginChange: (enabled: boolean) => void;
   showTray: boolean;
   onShowTrayChange: (enabled: boolean) => void;
+  workRules: WorkRules;
+  onWorkRulesChange: (patch: Partial<WorkRules>) => void;
+  desktopPreferences: DesktopPreferences | null;
+  onDesktopPreferencesChange: (patch: {
+    reminders?: Partial<ReminderPreferences>;
+    globalShortcut?: boolean;
+  }) => void;
 }
+
+const roundingOptions = [0, 5, 6, 10, 15, 30];
 
 function Section({
   title,
@@ -98,6 +109,7 @@ function Section({
 }
 
 const isMac = window.desktop?.platform === "darwin";
+const punchShortcutLabel = isMac ? "⌥⌘P" : "Ctrl+Alt+P";
 
 function PreferenceRow({
   id,
@@ -212,6 +224,10 @@ export default function ConfigPanel({
   onOpenAtLoginChange,
   showTray,
   onShowTrayChange,
+  workRules,
+  onWorkRulesChange,
+  desktopPreferences,
+  onDesktopPreferencesChange,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -497,6 +513,78 @@ export default function ConfigPanel({
               disabled={!startupAvailable}
               onCheckedChange={onOpenAtLoginChange}
             />
+            {desktopPreferences ? (
+              <>
+                <PreferenceRow
+                  id="global-shortcut"
+                  label={`Punch shortcut ${punchShortcutLabel}`}
+                  description={
+                    desktopPreferences.globalShortcut &&
+                    !desktopPreferences.globalShortcutActive
+                      ? `Another app is already using ${punchShortcutLabel}.`
+                      : "Punch in or out from any app, with a notification to confirm."
+                  }
+                  checked={desktopPreferences.globalShortcut}
+                  onCheckedChange={(checked) =>
+                    onDesktopPreferencesChange({ globalShortcut: checked })
+                  }
+                />
+                <PreferenceRow
+                  id="overtime-reminder"
+                  label="Still on the clock?"
+                  description="A reminder once today's scheduled hours are done and you haven't punched out."
+                  checked={desktopPreferences.reminders.overtime}
+                  disabled={!desktopPreferences.notificationsSupported}
+                  onCheckedChange={(checked) =>
+                    onDesktopPreferencesChange({
+                      reminders: { overtime: checked },
+                    })
+                  }
+                />
+                <div
+                  className={cn(
+                    "space-y-3 rounded-lg border bg-muted/40 p-3",
+                    !desktopPreferences.notificationsSupported && "opacity-60",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="start-reminder">Punch-in nudge</Label>
+                      <p className="text-xs text-muted-foreground">
+                        On workdays, if the card is still empty at this time.
+                      </p>
+                    </div>
+                    <Switch
+                      id="start-reminder"
+                      checked={desktopPreferences.reminders.startTime !== null}
+                      disabled={!desktopPreferences.notificationsSupported}
+                      onCheckedChange={(checked) =>
+                        onDesktopPreferencesChange({
+                          reminders: { startTime: checked ? "09:00" : null },
+                        })
+                      }
+                    />
+                  </div>
+                  {desktopPreferences.reminders.startTime !== null ? (
+                    <Input
+                      type="time"
+                      aria-label="Punch-in nudge time"
+                      className="font-mono"
+                      defaultValue={desktopPreferences.reminders.startTime}
+                      key={desktopPreferences.reminders.startTime}
+                      onBlur={(event) => {
+                        const value = event.target.value;
+                        if (/^\d{2}:\d{2}$/.test(value)) {
+                          onDesktopPreferencesChange({
+                            reminders: { startTime: value },
+                          });
+                        }
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </>
+            ) : null}
             {startupError ? (
               <p className="text-xs text-destructive">{startupError}</p>
             ) : null}
@@ -541,6 +629,102 @@ export default function ConfigPanel({
               }
             />
           </div>
+        </Section>
+
+        <Section title="Time rules">
+          <p className="text-xs text-muted-foreground">
+            Applied to punched sessions when hours are counted. Your recorded
+            times are never changed, so you can adjust these at any time.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="break-minutes">Auto break (min)</Label>
+              <Input
+                id="break-minutes"
+                type="number"
+                min={0}
+                max={240}
+                step={5}
+                value={workRules.breakMinutes}
+                onChange={(event) =>
+                  onWorkRulesChange({
+                    breakMinutes: Number(event.target.value),
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="break-after-hours">On days over (h)</Label>
+              <Input
+                id="break-after-hours"
+                type="number"
+                min={0}
+                max={24}
+                step={0.5}
+                disabled={workRules.breakMinutes === 0}
+                value={workRules.breakAfterHours}
+                onChange={(event) =>
+                  onWorkRulesChange({
+                    breakAfterHours: Number(event.target.value),
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Round punches</Label>
+              <Select
+                value={String(workRules.roundingMinutes)}
+                onValueChange={(next) =>
+                  onWorkRulesChange({ roundingMinutes: Number(next) })
+                }
+              >
+                <SelectTrigger aria-label="Round punches">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {roundingOptions.map((minutes) => (
+                    <SelectItem key={minutes} value={String(minutes)}>
+                      {minutes === 0 ? "Exact" : `Nearest ${minutes} min`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="overtime-multiplier">Overtime rate (×)</Label>
+              <Input
+                id="overtime-multiplier"
+                type="number"
+                min={1}
+                max={5}
+                step={0.25}
+                value={workRules.overtimeMultiplier}
+                onChange={(event) =>
+                  onWorkRulesChange({
+                    overtimeMultiplier: Number(event.target.value),
+                  })
+                }
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {workRules.breakMinutes > 0
+              ? `Days with ${workRules.breakAfterHours}h or more on the clock lose ${workRules.breakMinutes} min, minus any gaps between sessions. `
+              : ""}
+            {workRules.overtimeMultiplier > 1
+              ? `Hours on days off are paid at ${workRules.overtimeMultiplier}×.`
+              : "Set an overtime rate above 1× to pay days off at a premium."}
+          </p>
+          <PreferenceRow
+            id="overtime-long-days"
+            label="Long workdays count as overtime"
+            description={`Hours beyond the scheduled ${hoursPerDay}h on a workday are paid at the overtime rate too.`}
+            checked={workRules.overtimeIncludesLongDays}
+            disabled={workRules.overtimeMultiplier <= 1}
+            onCheckedChange={(checked) =>
+              onWorkRulesChange({ overtimeIncludesLongDays: checked })
+            }
+          />
         </Section>
 
         <Section title="Pay & currency">

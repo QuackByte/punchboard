@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld("desktop", {
   resizeTray: (height: number) => {
     ipcRenderer.send("tray:resize", height);
   },
+  getDesktopPreferences: () => ipcRenderer.invoke("desktop:get-preferences"),
+  setDesktopPreferences: (patch: unknown) =>
+    ipcRenderer.invoke("desktop:set-preferences", patch),
   setShowTray: (enabled: boolean) =>
     ipcRenderer.invoke("tray:set-enabled", enabled),
   onOpenSettings: (listener: () => void) => {

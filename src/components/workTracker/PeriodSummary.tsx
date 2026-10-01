@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { PayResult } from "./calculations";
 import { CurrencyCode } from "./types";
 import { formatDuration } from "./utils";
 
@@ -135,6 +136,8 @@ interface PaySummaryProps {
   showConversion: boolean;
   hourlyRate: number;
   taxPercent: number;
+  overtimeMultiplier: number;
+  pay: PayResult;
   grossSalary: number;
   taxAmount: number;
   extraDeductionAmount: number;
@@ -148,6 +151,8 @@ export function PaySummary({
   showConversion,
   hourlyRate,
   taxPercent,
+  overtimeMultiplier,
+  pay,
   grossSalary,
   taxAmount,
   extraDeductionAmount,
@@ -164,6 +169,20 @@ export function PaySummary({
       </div>
 
       <dl className="mb-4 mt-4 space-y-1.5 font-mono text-[13px]">
+        {pay.overtimePay > 0 ? (
+          <>
+            <ReceiptLine
+              label={`Regular ${formatDuration(pay.regularHours)}`}
+              value={formatMoney(pay.regularPay, currency)}
+              muted
+            />
+            <ReceiptLine
+              label={`Overtime ${formatDuration(pay.overtimeHours)} ×${overtimeMultiplier}`}
+              value={`+${formatMoney(pay.overtimePay, currency)}`}
+              accent
+            />
+          </>
+        ) : null}
         <ReceiptLine label="Gross" value={formatMoney(grossSalary, currency)} />
         <ReceiptLine
           label={`Tax ${taxPercent}%`}
@@ -200,16 +219,24 @@ function ReceiptLine({
   label,
   value,
   muted = false,
+  accent = false,
 }: {
   label: string;
   value: string;
   muted?: boolean;
+  accent?: boolean;
 }) {
   return (
     <div className="flex items-baseline">
       <dt className="text-muted-foreground">{label}</dt>
       <span className="leader" aria-hidden />
-      <dd className={cn("tabular", muted && "text-muted-foreground")}>
+      <dd
+        className={cn(
+          "tabular",
+          muted && "text-muted-foreground",
+          accent && "text-extra",
+        )}
+      >
         {value}
       </dd>
     </div>
