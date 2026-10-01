@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.8.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.7.0...punchboard-v1.8.0) (2026-10-01)
+
+
+### Features
+
+* add tray punch controls and open at login ([d164441](https://github.com/QuackByte/punchboard/commit/d1644413d22fc9248aac40087fac6400e1384d4c))
+* add tray punch controls and open at login ([3460a46](https://github.com/QuackByte/punchboard/commit/3460a465f47eaa44d7f61ef30939d39ff8e1d5fd))
+* autosave web data to shared files ([66b616a](https://github.com/QuackByte/punchboard/commit/66b616abeb09b376fb308f2fe09b12f3c92dd48a))
+* autosave web data to shared files ([2890998](https://github.com/QuackByte/punchboard/commit/2890998fa3ed4bc75c39b5bfa52e5a8cd41dec61))
+
+
+### Bug Fixes
+
+* **ci:** rebuild existing release tags from main ([b4dd75b](https://github.com/QuackByte/punchboard/commit/b4dd75ba9562b24bfc807360b4a0efd7f6219a6c))
+* **ci:** rebuild existing tags from current source ([f6f93c7](https://github.com/QuackByte/punchboard/commit/f6f93c781de02e2fb51e595aa695c431e9473d2d))
+* upgrade electron-builder for macOS signing ([5f23a25](https://github.com/QuackByte/punchboard/commit/5f23a25264878ed47a85c7c07389f14c4a1e14dc))
+* upgrade electron-builder for macOS signing ([e3b019d](https://github.com/QuackByte/punchboard/commit/e3b019d84a4289b0e339ca0ade2aa0ab0df5d3f1))
+* wire tray controls through packaged preload ([a991440](https://github.com/QuackByte/punchboard/commit/a9914404fa5e161c8c1395a32efa2ae07ef65c03))
+* wire tray controls through packaged preload ([809f688](https://github.com/QuackByte/punchboard/commit/809f688da6c01de31ef31d5b912614b733ceaf45))
+
 ## [1.7.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.6.0...punchboard-v1.7.0) (2026-10-01)
 
 
