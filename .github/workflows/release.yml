@@ -157,7 +157,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+          # Manual rebuilds use current main code, but upload to the selected release tag.
+          # Tag pushes continue to build the source associated with that tag.
+          ref: ${{ github.ref }}
 
       - uses: actions/setup-node@v6
         with:
