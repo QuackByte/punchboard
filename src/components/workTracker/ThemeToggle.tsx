@@ -1,4 +1,5 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Theme } from "./useTheme";
 
 interface ThemeToggleProps {
@@ -6,10 +7,10 @@ interface ThemeToggleProps {
   onThemeChange: (theme: Theme) => void;
 }
 
-const options: { value: Theme; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+const options: { value: Theme; label: string; Icon: typeof Sun }[] = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "system", label: "System", Icon: Monitor },
+  { value: "dark", label: "Dark", Icon: Moon },
 ];
 
 export default function ThemeToggle({
@@ -17,21 +18,28 @@ export default function ThemeToggle({
   onThemeChange,
 }: ThemeToggleProps) {
   return (
-    <Tabs
-      value={theme}
-      onValueChange={(value) => onThemeChange(value as Theme)}
+    <div
+      role="radiogroup"
+      aria-label="Theme"
+      className="flex items-center rounded-xl border bg-card/80 p-0.5 backdrop-blur"
     >
-      <TabsList className="h-8 p-0.5">
-        {options.map((option) => (
-          <TabsTrigger
-            key={option.value}
-            value={option.value}
-            className="px-2.5 py-1 text-xs"
-          >
-            {option.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+      {options.map(({ value, label, Icon }) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={theme === value}
+          aria-label={label}
+          title={label}
+          onClick={() => onThemeChange(value)}
+          className={cn(
+            "grid h-8 w-8 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:text-foreground",
+            theme === value && "bg-foreground text-background hover:text-background",
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </button>
+      ))}
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   ExceptionType,
   SAVED_MONTHS_KEY,
   SETTINGS_KEY,
+  TimeEntry,
   TrackerData,
   TrackerSettings,
   TrackerUiState,
@@ -21,13 +22,18 @@ import {
   clampHours,
   clampPercent,
   dateKey,
+  formatClock,
   formatMonthKey,
+  getCurrentPayslipEndMonthKey,
   getDatesInPayslipRange,
   getInitialUiState,
+  minutesSinceMidnight,
+  parseDayInput,
   parseMonthKey,
   safeStorageGetItem,
   safeStorageRemoveItem,
   safeStorageSetItem,
+  sumEntriesHours,
 } from "./utils";
 
 const isFileMode = !!window.fileAPI?.isElectron;
@@ -72,6 +78,9 @@ export function useWorkTracker() {
   );
   const [dailyHours, setDailyHours] = useState<Record<string, number>>({});
   const [extraHours, setExtraHours] = useState<Record<string, number>>({});
+  const [timeEntries, setTimeEntries] = useState<Record<string, TimeEntry[]>>(
+    {},
+  );
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [savedMonths, setSavedMonths] = useState<string[]>([]);
   const [lastSavedAt, setLastSavedAt] = useState<string>("");
@@ -162,7 +171,8 @@ export function useWorkTracker() {
     [],
   );
 
-  const fileWritePendingRef = useRef(false);
+  const fileWriteInFlightRef = useRef(false);
+  const pendingFilePayloadRef = useRef<string | null>(null);
 
   const getSavedMonthKeys = () => {
     const rawSavedMonths = safeStorageGetItem(SAVED_MONTHS_KEY);
@@ -237,34 +247,22 @@ export function useWorkTracker() {
     };
   };
 
-  const updateCurrentAndFutureMonthsGlobalValue = (
-    field: "hourlyRate" | "taxPercent" | "defaultHours" | "conversionRate",
-    value: number,
-  ) => {
-    const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
-
-    monthsToUpdate.forEach((mk) => {
-      const raw = safeStorageGetItem(`tracker-${mk}`);
-      if (!raw) {
-        return;
-      }
-
-      try {
-        const data = JSON.parse(raw) as TrackerData;
-        const nextData: TrackerData = {
-          ...data,
-          [field]: value,
-        };
-        safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
-      } catch {
-        // ignore corrupted month data
-      }
-    });
-  };
-
-  const updateCurrentAndFutureMonthsCurrency = (
-    field: "currency" | "secondaryCurrency",
-    value: CurrencyCode,
+  /**
+   * Rate/tax/currency settings carry forward: changing them in one month
+   * also rewrites every already-saved later month.
+   */
+  const updateCurrentAndFutureMonths = <
+    K extends
+      | "hourlyRate"
+      | "taxPercent"
+      | "defaultHours"
+      | "conversionRate"
+      | "currency"
+      | "secondaryCurrency"
+      | "currencyConversionEnabled",
+  >(
+    field: K,
+    value: TrackerData[K],
   ) => {
     const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
 
@@ -277,30 +275,6 @@ export function useWorkTracker() {
       try {
         const data = JSON.parse(raw) as TrackerData;
         const nextData: TrackerData = { ...data, [field]: value };
-        safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
-      } catch {
-        // ignore corrupted month data
-      }
-    });
-  };
-
-  const updateCurrentAndFutureMonthsCurrencyConversionEnabled = (
-    value: boolean,
-  ) => {
-    const monthsToUpdate = getSavedMonthKeys().filter((mk) => mk >= monthKey);
-
-    monthsToUpdate.forEach((mk) => {
-      const raw = safeStorageGetItem(`tracker-${mk}`);
-      if (!raw) {
-        return;
-      }
-
-      try {
-        const data = JSON.parse(raw) as TrackerData;
-        const nextData: TrackerData = {
-          ...data,
-          currencyConversionEnabled: value,
-        };
         safeStorageSetItem(`tracker-${mk}`, JSON.stringify(nextData));
       } catch {
         // ignore corrupted month data
@@ -436,32 +410,32 @@ export function useWorkTracker() {
   const onHourlyRateChange = (value: number) => {
     const clamped = Math.max(0, value || 0);
     setHourlyRate(clamped);
-    updateCurrentAndFutureMonthsGlobalValue("hourlyRate", clamped);
+    updateCurrentAndFutureMonths("hourlyRate", clamped);
     addActivity("value-change", `Updated hourly rate to ${clamped}`);
   };
 
   const onCurrencyChange = (value: CurrencyCode) => {
     setCurrency(value);
-    updateCurrentAndFutureMonthsCurrency("currency", value);
+    updateCurrentAndFutureMonths("currency", value);
     addActivity("value-change", `Updated currency to ${value}`);
   };
 
   const onSecondaryCurrencyChange = (value: CurrencyCode) => {
     setSecondaryCurrency(value);
-    updateCurrentAndFutureMonthsCurrency("secondaryCurrency", value);
+    updateCurrentAndFutureMonths("secondaryCurrency", value);
     addActivity("value-change", `Updated secondary currency to ${value}`);
   };
 
   const onConversionRateChange = (value: number) => {
     const clamped = Math.max(0, value || 0);
     setConversionRate(clamped);
-    updateCurrentAndFutureMonthsGlobalValue("conversionRate", clamped);
+    updateCurrentAndFutureMonths("conversionRate", clamped);
     addActivity("value-change", `Updated conversion rate to ${clamped}`);
   };
 
   const onCurrencyConversionEnabledChange = (value: boolean) => {
     setCurrencyConversionEnabled(value);
-    updateCurrentAndFutureMonthsCurrencyConversionEnabled(value);
+    updateCurrentAndFutureMonths("currencyConversionEnabled", value);
     addActivity(
       "value-change",
       `${value ? "Enabled" : "Disabled"} currency conversion`,
@@ -471,7 +445,7 @@ export function useWorkTracker() {
   const onTaxPercentChange = (value: number) => {
     const clamped = clampPercent(value);
     setTaxPercent(clamped);
-    updateCurrentAndFutureMonthsGlobalValue("taxPercent", clamped);
+    updateCurrentAndFutureMonths("taxPercent", clamped);
     addActivity("value-change", `Updated tax to ${clamped}%`);
   };
 
@@ -490,7 +464,7 @@ export function useWorkTracker() {
   const onDefaultHoursChange = (value: number) => {
     const next = Math.max(0, value || 0);
     setDefaultHours(next);
-    updateCurrentAndFutureMonthsGlobalValue("defaultHours", next);
+    updateCurrentAndFutureMonths("defaultHours", next);
     addActivity("value-change", `Updated holiday hours/day to ${next}`);
   };
 
@@ -561,9 +535,8 @@ export function useWorkTracker() {
     setIsMonthHydrated(false);
 
     const saved = safeStorageGetItem(`tracker-${monthKey}`);
-    const legacyData = saved ? null : null;
 
-    if (!saved && !legacyData) {
+    if (!saved) {
       const carryForward = getCarryForwardGlobalValues(monthKey);
       setSelectedDays(["mon", "tue", "wed", "thu", "fri"]);
       setHoursPerDay(8);
@@ -578,16 +551,13 @@ export function useWorkTracker() {
       setExceptions({});
       setDailyHours({});
       setExtraHours({});
+      setTimeEntries({});
       setIsMonthHydrated(true);
       return;
     }
 
     try {
-      const data = saved ? (JSON.parse(saved) as TrackerData) : legacyData;
-
-      if (!data) {
-        throw new Error("Missing tracker data");
-      }
+      const data = JSON.parse(saved) as TrackerData;
 
       setSelectedDays(data.selectedDays);
       setHoursPerDay(data.hoursPerDay);
@@ -612,6 +582,7 @@ export function useWorkTracker() {
       setExceptions(data.exceptions ?? {});
       setDailyHours(data.dailyHours ?? {});
       setExtraHours(data.extraHours ?? {});
+      setTimeEntries(data.timeEntries ?? {});
     } catch {
       safeStorageRemoveItem(`tracker-${monthKey}`);
       const carryForward = getCarryForwardGlobalValues(monthKey);
@@ -628,17 +599,14 @@ export function useWorkTracker() {
       setExceptions({});
       setDailyHours({});
       setExtraHours({});
+      setTimeEntries({});
     } finally {
       setIsMonthHydrated(true);
     }
   }, [monthKey, fileInitialized]);
 
-  useEffect(() => {
-    if (!isMonthHydrated) {
-      return;
-    }
-
-    const data: TrackerData = {
+  const currentMonthData = useMemo<TrackerData>(
+    () => ({
       selectedDays,
       hoursPerDay,
       hourlyRate,
@@ -652,9 +620,32 @@ export function useWorkTracker() {
       exceptions,
       dailyHours,
       extraHours,
-    };
+      timeEntries,
+    }),
+    [
+      selectedDays,
+      hoursPerDay,
+      hourlyRate,
+      currency,
+      secondaryCurrency,
+      conversionRate,
+      currencyConversionEnabled,
+      taxPercent,
+      extraDeduction,
+      defaultHours,
+      exceptions,
+      dailyHours,
+      extraHours,
+      timeEntries,
+    ],
+  );
 
-    safeStorageSetItem(`tracker-${monthKey}`, JSON.stringify(data));
+  useEffect(() => {
+    if (!isMonthHydrated) {
+      return;
+    }
+
+    safeStorageSetItem(`tracker-${monthKey}`, JSON.stringify(currentMonthData));
 
     setSavedMonths((previous) => {
       if (previous.includes(monthKey)) {
@@ -666,45 +657,10 @@ export function useWorkTracker() {
     });
 
     setLastSavedAt(new Date().toISOString());
-  }, [
-    selectedDays,
-    hoursPerDay,
-    hourlyRate,
-    currency,
-    secondaryCurrency,
-    conversionRate,
-    currencyConversionEnabled,
-    taxPercent,
-    extraDeduction,
-    defaultHours,
-    exceptions,
-    dailyHours,
-    extraHours,
-    monthKey,
-    isMonthHydrated,
-  ]);
+  }, [currentMonthData, monthKey, isMonthHydrated]);
 
   useEffect(() => {
     if (!isFileMode || !fileInitialized || !isMonthHydrated) return;
-    if (fileWritePendingRef.current) return;
-
-    fileWritePendingRef.current = true;
-
-    const currentMonthData: TrackerData = {
-      selectedDays,
-      hoursPerDay,
-      hourlyRate,
-      currency,
-      secondaryCurrency,
-      conversionRate,
-      currencyConversionEnabled,
-      taxPercent,
-      extraDeduction,
-      defaultHours,
-      exceptions,
-      dailyHours,
-      extraHours,
-    };
 
     const payload = buildFilePayload(
       monthKey,
@@ -715,28 +671,26 @@ export function useWorkTracker() {
       currentMonthData,
     );
 
-    void window.fileAPI!.writeFile(JSON.stringify(payload, null, 2)).finally(
-      () => {
-        fileWritePendingRef.current = false;
-      },
-    );
+    // Writes are serialized: if one is in flight, remember the latest payload
+    // and write it once the current write finishes, so no edit is dropped.
+    pendingFilePayloadRef.current = JSON.stringify(payload, null, 2);
+    if (fileWriteInFlightRef.current) return;
+
+    const flush = () => {
+      const next = pendingFilePayloadRef.current;
+      if (next === null) {
+        fileWriteInFlightRef.current = false;
+        return;
+      }
+      pendingFilePayloadRef.current = null;
+      fileWriteInFlightRef.current = true;
+      void window.fileAPI!.writeFile(next).finally(flush);
+    };
+    flush();
   }, [
-    isFileMode,
     fileInitialized,
     isMonthHydrated,
-    selectedDays,
-    hoursPerDay,
-    hourlyRate,
-    currency,
-    secondaryCurrency,
-    conversionRate,
-    currencyConversionEnabled,
-    taxPercent,
-    extraDeduction,
-    defaultHours,
-    exceptions,
-    dailyHours,
-    extraHours,
+    currentMonthData,
     monthKey,
     graphYear,
     payslipStartDay,
@@ -875,17 +829,22 @@ export function useWorkTracker() {
       return;
     }
 
+    // Logged outside the state updater so StrictMode's double-invoke
+    // doesn't record the change twice.
+    const clearing = type === "none" || exceptions[key] === type;
     setExceptions((previous) => {
       const next = { ...previous };
-      if (type === "none" || previous[key] === type) {
+      if (clearing) {
         delete next[key];
-        addActivity("exception-change", `Cleared mark on ${key}`);
       } else {
         next[key] = type;
-        addActivity("exception-change", `Marked ${key} as ${type}`);
       }
       return next;
     });
+    addActivity(
+      "exception-change",
+      clearing ? `Cleared mark on ${key}` : `Marked ${key} as ${type}`,
+    );
   };
 
   const updateDayHours = (key: string, value: number) => {
@@ -914,6 +873,154 @@ export function useWorkTracker() {
     addActivity("hours-change", `Logged ${nextValue} extra hours on ${key}`);
   };
 
+  /**
+   * Replaces a day's clocked sessions and re-derives its hour total, so
+   * every existing calculation (stats, week totals, yearly chart) keeps
+   * working off dailyHours/extraHours.
+   */
+  const setDayEntries = (key: string, entries: TimeEntry[]) => {
+    if (!payslipDateLookup.has(key)) {
+      return;
+    }
+
+    // Not re-sorted here: the day editor edits rows in place, and reordering
+    // while someone is typing a time would shuffle the focused row.
+    const sorted = entries;
+    const hours = clampHours(sumEntriesHours(sorted));
+
+    setTimeEntries((previous) => {
+      if (sorted.length === 0) {
+        const { [key]: _removed, ...rest } = previous;
+        return rest;
+      }
+      return { ...previous, [key]: sorted };
+    });
+
+    if (workingDateLookup.has(key)) {
+      setDailyHours((previous) => {
+        if (sorted.length === 0) {
+          const { [key]: _removed, ...rest } = previous;
+          return rest;
+        }
+        return { ...previous, [key]: hours };
+      });
+    } else {
+      setExtraHours((previous) => {
+        if (hours === 0) {
+          const { [key]: _removed, ...rest } = previous;
+          return rest;
+        }
+        return { ...previous, [key]: hours };
+      });
+    }
+
+    addActivity(
+      "hours-change",
+      sorted.length === 0
+        ? `Cleared sessions on ${key}`
+        : `Logged ${sorted.length} session${sorted.length === 1 ? "" : "s"} on ${key}`,
+    );
+  };
+
+  /** Sets a plain hour total for a day, dropping any clocked sessions. */
+  const setDayTotal = (key: string, hours: number) => {
+    setTimeEntries((previous) => {
+      if (!previous[key]) {
+        return previous;
+      }
+      const { [key]: _removed, ...rest } = previous;
+      return rest;
+    });
+
+    if (workingDateLookup.has(key)) {
+      updateDayHours(key, hours);
+    } else {
+      updateExtraHours(key, hours);
+    }
+  };
+
+  /** Drops any override so a workday falls back to the scheduled hours. */
+  const resetDay = (key: string) => {
+    setTimeEntries((previous) => {
+      const { [key]: _removed, ...rest } = previous;
+      return rest;
+    });
+    setDailyHours((previous) => {
+      const { [key]: _removed, ...rest } = previous;
+      return rest;
+    });
+    setExtraHours((previous) => {
+      const { [key]: _removed, ...rest } = previous;
+      return rest;
+    });
+    addActivity("hours-change", `Reset ${key} to schedule`);
+  };
+
+  /**
+   * Applies quick-entry text such as "9-13, 14-18" or "7.5". Returns false
+   * when the text can't be parsed so the caller can flag the input.
+   */
+  const applyDayInput = (key: string, text: string) => {
+    const parsed = parseDayInput(text);
+    if (!parsed) {
+      return false;
+    }
+    if (parsed.kind === "sessions") {
+      setDayEntries(key, parsed.entries);
+    } else {
+      setDayTotal(key, parsed.hours);
+    }
+    return true;
+  };
+
+  const currentPeriodMonthKey = getCurrentPayslipEndMonthKey(
+    today,
+    payslipStartDay,
+  );
+  const isViewingCurrentPeriod = monthKey === currentPeriodMonthKey;
+  const todayKey = dateKey(today);
+
+  /** The (single) running session in the loaded period, if any. */
+  const openSession = useMemo(() => {
+    for (const [key, entries] of Object.entries(timeEntries)) {
+      const index = entries.findIndex((entry) => entry.end === null);
+      if (index !== -1) {
+        return { key, index, entry: entries[index] };
+      }
+    }
+    return null;
+  }, [timeEntries]);
+
+  const punchIn = () => {
+    if (!isViewingCurrentPeriod || openSession) {
+      return;
+    }
+    const entries = timeEntries[todayKey] ?? [];
+    setDayEntries(todayKey, [
+      ...entries,
+      { start: formatClock(minutesSinceMidnight(new Date())), end: null },
+    ]);
+  };
+
+  const punchOut = () => {
+    if (!openSession || openSession.key !== todayKey) {
+      return;
+    }
+    const now = formatClock(minutesSinceMidnight(new Date()));
+    const entries = timeEntries[todayKey] ?? [];
+    const next = entries
+      .map((entry, index) =>
+        index === openSession.index ? { ...entry, end: now } : entry,
+      )
+      // A punch in/out within the same minute isn't a real session.
+      .filter((entry) => entry.start !== entry.end);
+    setDayEntries(todayKey, next);
+  };
+
+  const goToCurrentPeriod = () => {
+    handleMonthChange(currentPeriodMonthKey);
+  };
+
   const recentActivity = useMemo(() => activityLog.slice(0, 8), [activityLog]);
 
   const yearlyData = useMemo(() => {
@@ -936,11 +1043,10 @@ export function useWorkTracker() {
       }
 
       const dataStr = safeStorageGetItem(`tracker-${mKey}`);
-      const legacyData = null;
 
-      if (dataStr || legacyData) {
+      if (dataStr) {
         try {
-          const data: TrackerData = dataStr ? JSON.parse(dataStr) : legacyData;
+          const data: TrackerData = JSON.parse(dataStr);
           const rangeDates = getDatesInPayslipRange(mKey, payslipStartDay);
 
           let totalActualHours = 0;
@@ -1020,22 +1126,6 @@ export function useWorkTracker() {
   }, [monthKey]);
 
   const exportData = () => {
-    const currentMonthData: TrackerData = {
-      selectedDays,
-      hoursPerDay,
-      hourlyRate,
-      currency,
-      secondaryCurrency,
-      conversionRate,
-      currencyConversionEnabled,
-      taxPercent,
-      extraDeduction,
-      defaultHours,
-      exceptions,
-      dailyHours,
-      extraHours,
-    };
-
     const payload = buildFilePayload(
       monthKey,
       graphYear,
@@ -1100,6 +1190,7 @@ export function useWorkTracker() {
     dailyHours,
     extraHours,
     extraHoursTotal,
+    timeEntries,
     savedMonths,
     lastSavedAt,
     graphYear,
@@ -1134,6 +1225,16 @@ export function useWorkTracker() {
     setDayException,
     updateDayHours,
     updateExtraHours,
+    setDayEntries,
+    setDayTotal,
+    resetDay,
+    applyDayInput,
+    todayKey,
+    isViewingCurrentPeriod,
+    goToCurrentPeriod,
+    openSession,
+    punchIn,
+    punchOut,
     recentActivity,
     yearlyData,
     calendarCells,

@@ -41,6 +41,16 @@ export function getCurrencySymbol(currency: CurrencyCode) {
 }
 
 export type DayKey = (typeof daysOfWeek)[number]["key"];
+
+/**
+ * One clocked session within a day, as "HH:MM" wall-clock times. A null
+ * `end` means the session is still running (punched in, not yet out). An
+ * `end` earlier than `start` means the session ran past midnight.
+ */
+export interface TimeEntry {
+  start: string;
+  end: string | null;
+}
 export type ExceptionType = "vacation" | "sick";
 export type ActivityType =
   | "month-change"
@@ -63,6 +73,12 @@ export interface TrackerData {
   exceptions: Record<string, ExceptionType>;
   dailyHours: Record<string, number>;
   extraHours: Record<string, number>;
+  /**
+   * Clocked sessions per day. When a day has entries, its hours in
+   * `dailyHours`/`extraHours` are derived from them, so files stay readable
+   * by older versions that only know about hour totals.
+   */
+  timeEntries?: Record<string, TimeEntry[]>;
 }
 
 export interface TrackerSettings {
