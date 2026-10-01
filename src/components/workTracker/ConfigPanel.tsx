@@ -75,6 +75,8 @@ interface ConfigPanelProps {
   openAtLogin: boolean;
   startupError: string | null;
   onOpenAtLoginChange: (enabled: boolean) => void;
+  showTray: boolean;
+  onShowTrayChange: (enabled: boolean) => void;
 }
 
 function Section({
@@ -91,6 +93,44 @@ function Section({
       {!first ? <Separator className="mb-6" /> : null}
       <p className="stamp">{title}</p>
       <div className="mt-3 space-y-4">{children}</div>
+    </div>
+  );
+}
+
+const isMac = window.desktop?.platform === "darwin";
+
+function PreferenceRow({
+  id,
+  label,
+  description,
+  checked,
+  disabled = false,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3",
+        disabled && "opacity-60",
+      )}
+    >
+      <div className="space-y-1">
+        <Label htmlFor={id}>{label}</Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
     </div>
   );
 }
@@ -170,6 +210,8 @@ export default function ConfigPanel({
   openAtLogin,
   startupError,
   onOpenAtLoginChange,
+  showTray,
+  onShowTrayChange,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -428,21 +470,33 @@ export default function ConfigPanel({
           ) : null}
         </Section>
 
-        {startupAvailable ? (
+        {isFileMode ? (
           <Section title="Desktop app">
-            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3">
-              <div className="space-y-1">
-                <Label htmlFor="open-at-login">Open at login</Label>
-                <p className="text-xs text-muted-foreground">
-                  Start Punchboard when you sign in.
-                </p>
-              </div>
-              <Switch
-                id="open-at-login"
-                checked={openAtLogin}
-                onCheckedChange={onOpenAtLoginChange}
-              />
-            </div>
+            <PreferenceRow
+              id="show-tray"
+              label={isMac ? "Show in menu bar" : "Show in system tray"}
+              description={
+                isMac
+                  ? "Punch in and out from the menu bar, with the running time next to the icon."
+                  : "Punch in and out from the system tray."
+              }
+              checked={showTray}
+              onCheckedChange={onShowTrayChange}
+            />
+            <PreferenceRow
+              id="open-at-login"
+              label="Open at login"
+              description={
+                startupAvailable
+                  ? showTray
+                    ? `Start Punchboard when you sign in, quietly in the ${isMac ? "menu bar" : "tray"}.`
+                    : "Start Punchboard when you sign in."
+                  : "Available in the installed app on macOS and Windows."
+              }
+              checked={openAtLogin}
+              disabled={!startupAvailable}
+              onCheckedChange={onOpenAtLoginChange}
+            />
             {startupError ? (
               <p className="text-xs text-destructive">{startupError}</p>
             ) : null}

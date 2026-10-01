@@ -48,7 +48,13 @@ export interface DesktopAPI {
   openMainFromTray(): void;
   showTrayMenu(): void;
   resizeTray(height: number): void;
-  getStartupConfig(): Promise<{ available: boolean; openAtLogin: boolean }>;
+  getStartupConfig(): Promise<{
+    available: boolean;
+    openAtLogin: boolean;
+    showTray: boolean;
+  }>;
+  setShowTray(enabled: boolean): Promise<{ showTray: boolean }>;
+  onOpenSettings(listener: () => void): () => void;
   setOpenAtLogin(enabled: boolean): Promise<{
     success: boolean;
     openAtLogin: boolean;

@@ -1,5 +1,5 @@
 import { Download, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import CalendarGrid from "./workTracker/CalendarGrid";
@@ -15,6 +15,10 @@ import { useWorkTracker } from "./workTracker/useWorkTracker";
 import { dateKey, getPayslipRange } from "./workTracker/utils";
 import YearlyOverview from "./workTracker/YearlyOverview";
 
+const shortcutLabel = /Mac|iPhone|iPad/.test(navigator.platform)
+  ? "⌘,"
+  : "Ctrl+,";
+
 function formatPeriodLabel(monthKey: string, payslipStartDay: number) {
   const { start, end } = getPayslipRange(monthKey, payslipStartDay);
   const format = (date: Date) =>
@@ -27,6 +31,25 @@ export default function WorkTracker() {
   const { showConfig, setShowConfig } = usePanelVisibility();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const tracker = useWorkTracker();
+
+  // ⌘, / Ctrl+, opens Settings, like any desktop app. The macOS app menu
+  // sends the same request from the main process.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "," && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setShowConfig(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const unsubscribe = window.desktop?.onOpenSettings(() =>
+      setShowConfig(true),
+    );
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      unsubscribe?.();
+    };
+  }, [setShowConfig]);
   const {
     today,
     monthKey,
@@ -90,6 +113,8 @@ export default function WorkTracker() {
     openAtLogin,
     startupError,
     changeOpenAtLogin,
+    showTray,
+    changeShowTray,
   } = tracker;
 
   if (isFileMode && !fileInitialized) {
@@ -171,7 +196,7 @@ export default function WorkTracker() {
             <button
               type="button"
               aria-label="Settings"
-              title="Settings"
+              title={`Settings (${shortcutLabel})`}
               onClick={() => setShowConfig(!showConfig)}
               className="grid h-9 w-9 place-items-center rounded-xl border bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
             >
@@ -229,6 +254,8 @@ export default function WorkTracker() {
           openAtLogin={openAtLogin}
           startupError={startupError}
           onOpenAtLoginChange={changeOpenAtLogin}
+          showTray={showTray}
+          onShowTrayChange={changeShowTray}
         />
 
         <main className="space-y-4">

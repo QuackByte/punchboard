@@ -42,6 +42,13 @@ contextBridge.exposeInMainWorld("desktop", {
   resizeTray: (height: number) => {
     ipcRenderer.send("tray:resize", height);
   },
+  setShowTray: (enabled: boolean) =>
+    ipcRenderer.invoke("tray:set-enabled", enabled),
+  onOpenSettings: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on("settings:open", handler);
+    return () => ipcRenderer.removeListener("settings:open", handler);
+  },
   getStartupConfig: () => ipcRenderer.invoke("startup:get-config"),
   setOpenAtLogin: (enabled: boolean) =>
     ipcRenderer.invoke("startup:set-open-at-login", enabled),

@@ -122,6 +122,7 @@ export function useWorkTracker() {
   const [browserFileError, setBrowserFileError] = useState<string | null>(null);
   const [startupAvailable, setStartupAvailable] = useState(false);
   const [openAtLogin, setOpenAtLogin] = useState(false);
+  const [showTray, setShowTray] = useState(true);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [trayPunchPending, setTrayPunchPending] = useState(false);
   const [fileLoadVersion, setFileLoadVersion] = useState(0);
@@ -141,6 +142,7 @@ export function useWorkTracker() {
         if (!active) return;
         setStartupAvailable(config.available);
         setOpenAtLogin(config.openAtLogin);
+        setShowTray(config.showTray);
       })
       .catch((error: unknown) => {
         if (active) {
@@ -165,6 +167,19 @@ export function useWorkTracker() {
     } catch (error) {
       setStartupError(
         error instanceof Error ? error.message : "Could not update startup setting.",
+      );
+    }
+  }, []);
+
+  const changeShowTray = useCallback(async (enabled: boolean) => {
+    if (!window.desktop?.isElectron) return;
+    setStartupError(null);
+    try {
+      const result = await window.desktop.setShowTray(enabled);
+      setShowTray(result.showTray);
+    } catch (error) {
+      setStartupError(
+        error instanceof Error ? error.message : "Could not update the tray setting.",
       );
     }
   }, []);
@@ -1825,5 +1840,7 @@ export function useWorkTracker() {
     openAtLogin,
     startupError,
     changeOpenAtLogin,
+    showTray,
+    changeShowTray,
   };
 }

@@ -77,16 +77,26 @@ function loadAutoUpdater(): AppUpdater | null {
   }
 }
 
-function readAppConfig(): { dataFilePath?: string } {
+type AppConfig = {
+  dataFilePath?: string;
+  /** Whether the menu bar / tray icon is shown. Defaults to on. */
+  showTray?: boolean;
+};
+
+function readAppConfig(): AppConfig {
   try {
     const raw = fs.readFileSync(APP_CONFIG_PATH, "utf8");
-    return JSON.parse(raw) as { dataFilePath?: string };
+    return JSON.parse(raw) as AppConfig;
   } catch {
     return {};
   }
 }
 
-function writeAppConfig(config: { dataFilePath?: string }) {
+function isTrayEnabled() {
+  return readAppConfig().showTray !== false;
+}
+
+function writeAppConfig(config: AppConfig) {
   try {
     fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch {
@@ -107,7 +117,38 @@ function getStartupConfig() {
     openAtLogin: canConfigureLoginItem()
       ? app.getLoginItemSettings().openAtLogin
       : false,
+    showTray: isTrayEnabled(),
   };
+}
+
+function applyLoginItemSettings(enabled: boolean) {
+  // Starting hidden only makes sense when the tray icon is there to reopen
+  // the window from.
+  const startHidden = enabled && isTrayEnabled();
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    ...(process.platform === "darwin"
+      ? { openAsHidden: startHidden }
+      : { args: startHidden ? ["--hidden"] : [] }),
+  });
+}
+
+function setShowTray(enabled: boolean) {
+  writeAppConfig({ ...readAppConfig(), showTray: enabled });
+  if (enabled) {
+    createTray();
+  } else {
+    destroyTray();
+  }
+  if (canConfigureLoginItem() && app.getLoginItemSettings().openAtLogin) {
+    applyLoginItemSettings(true);
+  }
+  return { showTray: enabled };
+}
+
+function openSettings() {
+  showMainWindow();
+  mainWindow?.webContents.send("settings:open");
 }
 
 function setOpenAtLogin(enabled: boolean) {
@@ -120,12 +161,7 @@ function setOpenAtLogin(enabled: boolean) {
   }
 
   try {
-    app.setLoginItemSettings({
-      openAtLogin: enabled,
-      ...(process.platform === "darwin"
-        ? { openAsHidden: enabled }
-        : { args: enabled ? ["--hidden"] : [] }),
-    });
+    applyLoginItemSettings(enabled);
     const openAtLogin = app.getLoginItemSettings().openAtLogin;
     updateTrayMenu();
     mainWindow?.webContents.send("startup:changed", openAtLogin);
@@ -182,6 +218,7 @@ function buildTrayMenu() {
     },
     { type: "separator" },
     { label: "Open Punchboard", click: showMainWindow },
+    { label: "Settings…", click: openSettings },
     {
       label: "Open at Login",
       type: "checkbox",
@@ -378,6 +415,50 @@ function toggleTrayWindow() {
   }
 }
 
+function destroyTray() {
+  if (trayTitleTimer) {
+    clearInterval(trayTitleTimer);
+    trayTitleTimer = null;
+  }
+  if (trayWindow && !trayWindow.isDestroyed()) trayWindow.destroy();
+  trayWindow = null;
+  tray?.destroy();
+  tray = null;
+}
+
+/** macOS app menu, so Punchboard gets the standard ⌘, for Settings. */
+function setupApplicationMenu() {
+  if (process.platform !== "darwin") return;
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: app.name,
+        submenu: [
+          { role: "about" },
+          { type: "separator" },
+          {
+            label: "Settings…",
+            accelerator: "CmdOrCtrl+,",
+            click: openSettings,
+          },
+          { type: "separator" },
+          { role: "services" },
+          { type: "separator" },
+          { role: "hide" },
+          { role: "hideOthers" },
+          { role: "unhide" },
+          { type: "separator" },
+          { role: "quit" },
+        ],
+      },
+      { role: "editMenu" },
+      { role: "viewMenu" },
+      { role: "windowMenu" },
+    ]),
+  );
+}
+
 function createTray() {
   if (tray) return;
 
@@ -435,6 +516,9 @@ function registerTrayIpcHandlers() {
 
   ipcMain.on("window:show", showMainWindow);
   ipcMain.handle("startup:get-config", getStartupConfig);
+  ipcMain.handle("tray:set-enabled", (_event, enabled: unknown) =>
+    setShowTray(enabled === true),
+  );
   ipcMain.handle("startup:set-open-at-login", (_event, enabled: unknown) =>
     setOpenAtLogin(enabled === true),
   );
@@ -641,7 +725,8 @@ app.whenReady().then(() => {
     app.dock?.setIcon(loadAppIcon(iconPath));
   }
 
-  createTray();
+  setupApplicationMenu();
+  if (isTrayEnabled()) createTray();
   setupAutoUpdates();
   const wasOpenedAtLogin = canConfigureLoginItem()
     ? app.getLoginItemSettings().wasOpenedAtLogin

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 const STORAGE_KEY = "work-tracker-config-panel-visible";
 
@@ -19,14 +19,14 @@ export function usePanelVisibility() {
     getStoredVisibility,
   );
 
-  const setShowConfig = (next: boolean) => {
+  const setShowConfig = useCallback((next: boolean) => {
     try {
       localStorage.setItem(STORAGE_KEY, String(next));
     } catch {
       // ignore storage errors
     }
     setShowConfigState(next);
-  };
+  }, []);
 
   return { showConfig, setShowConfig };
 }
