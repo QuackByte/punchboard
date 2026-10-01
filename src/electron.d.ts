@@ -35,6 +35,19 @@ export interface TrayStatus {
   } | null;
 }
 
+export interface ReminderPreferences {
+  overtime: boolean;
+  /** "HH:MM", or null when the punch-in nudge is off. */
+  startTime: string | null;
+}
+
+export interface DesktopPreferences {
+  reminders: ReminderPreferences;
+  globalShortcut: boolean;
+  globalShortcutActive: boolean;
+  notificationsSupported: boolean;
+}
+
 export interface DesktopAPI {
   isElectron: true;
   platform: string;
@@ -54,6 +67,11 @@ export interface DesktopAPI {
     showTray: boolean;
   }>;
   setShowTray(enabled: boolean): Promise<{ showTray: boolean }>;
+  getDesktopPreferences(): Promise<DesktopPreferences>;
+  setDesktopPreferences(patch: {
+    reminders?: Partial<ReminderPreferences>;
+    globalShortcut?: boolean;
+  }): Promise<DesktopPreferences>;
   onOpenSettings(listener: () => void): () => void;
   setOpenAtLogin(enabled: boolean): Promise<{
     success: boolean;

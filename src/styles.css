@@ -161,3 +161,27 @@ html.tray-panel body {
   overflow: hidden;
   user-select: none;
 }
+
+/* Printing renders only the timesheet, black on white in either theme. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000;
+  }
+
+  body * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .timesheet {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

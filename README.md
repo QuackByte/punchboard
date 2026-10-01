@@ -24,10 +24,14 @@ marketing page, or jump straight into the
 - **Clocked sessions** — click any day on the time card to log sessions,
   either with quick entry (`9-13, 14-18:30`, `8:45 to 17`, or a plain total
   like `7.5` / `7h 30m`) or by editing start/end times directly. Each day
-  shows a mini timeline of its sessions.
+  shows a mini timeline of its sessions, and each session can carry a note.
+- **Time rules** — optional automatic unpaid break on long days (minus any
+  gaps you already took), punch rounding to 5/6/10/15/30 minutes, and an
+  overtime rate for days off and, optionally, hours beyond the schedule.
+  Rules apply when hours are counted, so recorded times never change.
 - **Day exceptions** — mark days as vacation, sick leave, or holiday, with
   automatic exclusion from expected working hours.
-- **Extra hours** — track overtime separately from the regular schedule.
+- **Extra hours** — track hours on days off separately from the schedule.
 - **Salary estimation** — set an hourly rate, tax percentage, and extra
   deductions to see estimated gross and net pay for the current payslip
   period (with a configurable payslip start day).
@@ -35,6 +39,17 @@ marketing page, or jump straight into the
   primary one, using a manual conversion rate.
 - **Yearly overview** — a chart of hours worked per month across the year.
 - **Weekly totals** — hours per ISO week against the scheduled hours.
+- **Timesheet export** — download the period as CSV, or print / save a
+  one-page PDF timesheet with sessions, notes, totals and pay.
+- **Undo** — reset a day or delete a session by mistake? Undo it from the
+  toast or with ⌘Z / Ctrl+Z.
+- **Keyboard friendly** — arrow keys move around the time card, Enter edits
+  a day, `T` jumps to today and ⌘, / Ctrl+, opens Settings.
+- **Menu bar / tray** — a mini punch clock in the menu bar (macOS) or system
+  tray, with the running time next to the icon.
+- **Desktop extras** — a global ⌥⌘P / Ctrl+Alt+P punch shortcut, a "still
+  on the clock?" reminder once the day's hours are done, an optional
+  punch-in nudge on workdays, and open at login.
 - **Import/export** — back up or move your data as a JSON file.
 - **Light/dark theme**.
 - **Auto-updates** on macOS, Windows, and Linux via `electron-updater`.
@@ -70,7 +85,12 @@ npm run dev
 
 # Run the full Electron app in dev mode, with hot reload
 npm run electron:dev
+
+# Unit tests (Vitest) for the parsers, hour/pay maths and exports
+npm test
 ```
+
+Pull requests run the tests and a full build in CI.
 
 ### Building
 

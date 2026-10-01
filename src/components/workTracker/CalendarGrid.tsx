@@ -12,15 +12,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { workedTime } from "./calculations";
 import DayEditor from "./DayEditor";
-import { calendarHeaders, ExceptionType, TimeEntry } from "./types";
+import { calendarHeaders, ExceptionType, TimeEntry, WorkRules } from "./types";
 import { useNow } from "./useNow";
 import {
   dateKey,
   formatDuration,
+  keyToDate,
   minutesSinceMidnight,
   parseClock,
-  sumEntriesHours,
 } from "./utils";
 
 interface SelectedMonthInfo {
@@ -41,14 +42,25 @@ interface CalendarGridProps {
   dailyActualHours: Record<string, number>;
   timeEntries: Record<string, TimeEntry[]>;
   hoursPerDay: number;
+  workRules: WorkRules;
   today: Date;
+  /** Bumped to move keyboard focus to today's cell. */
+  focusTodayRequest: number;
   editingKey: string | null;
   onEditingKeyChange: (key: string | null) => void;
   onSetException: (key: string, type: ExceptionType | "none") => void;
   onApplyDayInput: (key: string, text: string) => boolean;
   onSetDayEntries: (key: string, entries: TimeEntry[]) => void;
+  onRemoveSession: (key: string, index: number) => void;
   onResetDay: (key: string) => void;
 }
+
+const ARROW_STEPS: Record<string, number> = {
+  ArrowLeft: -1,
+  ArrowRight: 1,
+  ArrowUp: -7,
+  ArrowDown: 7,
+};
 
 /** Visible window of the day for the mini timeline in each cell. */
 const TIMELINE_START = 6 * 60;
@@ -137,12 +149,15 @@ export default function CalendarGrid({
   dailyActualHours,
   timeEntries,
   hoursPerDay,
+  workRules,
   today,
+  focusTodayRequest,
   editingKey,
   onEditingKeyChange,
   onSetException,
   onApplyDayInput,
   onSetDayEntries,
+  onRemoveSession,
   onResetDay,
 }: CalendarGridProps) {
   const now = useNow(30_000);
@@ -158,6 +173,25 @@ export default function CalendarGrid({
       .get(editingKey)
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [editingKey]);
+
+  useEffect(() => {
+    if (!focusTodayRequest) return;
+    const cell = cellRefs.current.get(todayKey);
+    cell?.focus();
+    cell?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // Only on request; the cell itself may arrive a render later after a
+    // period change, which `cells` covers.
+  }, [focusTodayRequest, cells]);
+
+  /** Arrow keys walk the card day by day (left/right) or week by week. */
+  const moveFocus = (fromKey: string, step: number) => {
+    const target = keyToDate(fromKey);
+    target.setDate(target.getDate() + step);
+    const cell = cellRefs.current.get(dateKey(target));
+    if (cell && !cell.disabled) {
+      cell.focus();
+    }
+  };
 
   const renderCell = (cell: Date | null, index: number): ReactNode => {
     if (!cell) {
@@ -176,13 +210,20 @@ export default function CalendarGrid({
     const hasOverride = isWorkingDay
       ? dailyHours[key] !== undefined || hasEntries
       : (extraHours[key] ?? 0) > 0 || hasEntries;
-    const total = hasEntries
-      ? exceptionType === "vacation"
-        ? (dailyActualHours[key] ?? 0) -
-          sumEntriesHours(entries) +
-          sumEntriesHours(entries, liveNow)
-        : sumEntriesHours(entries, liveNow)
-      : (dailyActualHours[key] ?? 0);
+    // dailyActualHours already applies the time rules; for a running
+    // session swap in the live figure so the cell ticks along.
+    const stored = hasEntries ? workedTime(entries, workRules) : null;
+    const live =
+      hasEntries && isRunning && liveNow !== undefined
+        ? workedTime(entries, workRules, liveNow)
+        : stored;
+    const total =
+      (dailyActualHours[key] ?? 0) +
+      (stored && live ? (live.workedMinutes - stored.workedMinutes) / 60 : 0);
+    const notes = entries
+      .map((entry) => entry.note?.trim())
+      .filter(Boolean)
+      .join(" · ");
     const isScheduledOnly = isWorkingDay && !hasOverride && !exceptionType;
     const showMonthTag = cell.getDate() === 1 || index === cells.findIndex(Boolean);
     const isPast = cell < today && !isToday;
@@ -195,7 +236,15 @@ export default function CalendarGrid({
           else cellRefs.current.delete(key);
         }}
         disabled={!inPayslipRange}
-        aria-label={`${cell.toDateString()}, ${formatDuration(total)}${exceptionType ? `, ${exceptionType}` : ""}`}
+        title={notes || undefined}
+        aria-label={`${cell.toDateString()}, ${formatDuration(total)}${exceptionType ? `, ${exceptionType}` : ""}${notes ? `, ${notes}` : ""}`}
+        onKeyDown={(event) => {
+          const step = ARROW_STEPS[event.key];
+          if (step && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            moveFocus(key, step);
+          }
+        }}
         className={cn(
           "group relative flex h-[68px] w-full flex-col rounded-lg border p-1.5 text-left sm:h-[92px] sm:rounded-xl sm:p-2.5 outline-none transition-[transform,box-shadow,background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring hover:-translate-y-px hover:shadow-md active:translate-y-0 data-[state=open]:ring-2 data-[state=open]:ring-primary",
           exceptionType === "vacation"
@@ -232,6 +281,12 @@ export default function CalendarGrid({
               </span>
             ) : null}
           </span>
+          {notes && !exceptionType && !isRunning ? (
+            <span
+              aria-hidden
+              className="mt-0.5 h-1.5 w-1.5 rounded-full bg-foreground/30"
+            />
+          ) : null}
           {exceptionType ? (
             <span
               className={cn(
@@ -301,11 +356,13 @@ export default function CalendarGrid({
             exceptionType={exceptionType}
             entries={entries}
             totalHours={total}
+            breakMinutes={live?.breakMinutes ?? 0}
             hasOverride={hasOverride}
             hoursPerDay={hoursPerDay}
             nowMinutes={nowMinutes}
             onApplyText={(text) => onApplyDayInput(key, text)}
             onSetEntries={(next) => onSetDayEntries(key, next)}
+            onRemoveEntry={(index) => onRemoveSession(key, index)}
             onReset={() => onResetDay(key)}
             onSetException={(type) => onSetException(key, type)}
           />
@@ -361,7 +418,8 @@ export default function CalendarGrid({
           </h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Click a day to log times · right-click to mark
+          Click a day to log times · right-click to mark ·{" "}
+          <kbd className="font-mono">←→↑↓</kbd> move · <kbd className="font-mono">T</kbd> today
         </p>
       </div>
 

@@ -1,5 +1,5 @@
-import { ArrowRight, Plus, RotateCcw, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Plus, RotateCcw, StickyNote, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ExceptionType, TimeEntry } from "./types";
 import {
@@ -18,11 +18,14 @@ interface DayEditorProps {
   exceptionType?: ExceptionType;
   entries: TimeEntry[];
   totalHours: number;
+  /** Automatic break deducted from totalHours. */
+  breakMinutes: number;
   hasOverride: boolean;
   hoursPerDay: number;
   nowMinutes: number;
   onApplyText: (text: string) => boolean;
   onSetEntries: (entries: TimeEntry[]) => void;
+  onRemoveEntry: (index: number) => void;
   onReset: () => void;
   onSetException: (type: ExceptionType | "none") => void;
 }
@@ -34,11 +37,13 @@ export default function DayEditor({
   exceptionType,
   entries,
   totalHours,
+  breakMinutes,
   hasOverride,
   hoursPerDay,
   nowMinutes,
   onApplyText,
   onSetEntries,
+  onRemoveEntry,
   onReset,
   onSetException,
 }: DayEditorProps) {
@@ -188,6 +193,12 @@ export default function DayEditor({
               <span className="stamp">Sessions</span>
               <span className="font-mono text-xs tabular">
                 {formatDuration(totalHours)}
+                {breakMinutes > 0 ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · −{formatDuration(breakMinutes / 60)} break
+                  </span>
+                ) : null}
                 {!hasOverride && isWorkingDay && !exceptionType ? (
                   <span className="text-muted-foreground"> · scheduled</span>
                 ) : null}
@@ -199,8 +210,9 @@ export default function DayEditor({
                 {entries.map((entry, index) => (
                   <li
                     key={index}
-                    className="group flex items-center gap-1.5 rounded-lg border bg-background/60 px-2 py-1"
+                    className="group rounded-lg border bg-background/60 px-2 py-1"
                   >
+                    <div className="flex items-center gap-1.5">
                     <TimeField
                       label="Start"
                       value={entry.start}
@@ -232,13 +244,18 @@ export default function DayEditor({
                     <button
                       type="button"
                       aria-label="Remove session"
-                      onClick={() =>
-                        onSetEntries(entries.filter((_, i) => i !== index))
-                      }
+                      onClick={() => onRemoveEntry(index)}
                       className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
+                    </div>
+                    <NoteField
+                      value={entry.note ?? ""}
+                      onCommit={(note) =>
+                        updateEntry(index, { note: note || undefined })
+                      }
+                    />
                   </li>
                 ))}
               </ul>
@@ -297,6 +314,50 @@ export default function DayEditor({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A per-session note, saved on blur/Enter so typing doesn't write the data
+ * file on every keystroke.
+ */
+function NoteField({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next !== value) {
+      onCommit(next);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 pl-1">
+      <StickyNote className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+      <input
+        aria-label="Session note"
+        value={draft}
+        maxLength={120}
+        placeholder="Add a note"
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+            event.currentTarget.blur();
+          }
+        }}
+        className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
+      />
     </div>
   );
 }

@@ -2,9 +2,11 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
+  Notification,
   screen,
   Tray,
 } from "electron";
@@ -38,12 +40,19 @@ type TrayStatus = {
 };
 
 const TRAY_WINDOW_WIDTH = 340;
+const PUNCH_SHORTCUT = "CommandOrControl+Alt+P";
+/** How long after the start time the punch-in nudge may still fire. */
+const START_NUDGE_WINDOW_MINUTES = 120;
 
 let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let trayTitleTimer: NodeJS.Timeout | null = null;
 let isQuitting = false;
+let reminderTimer: NodeJS.Timeout | null = null;
+/** Reminders already shown, as "kind:dayKey", so each fires once a day. */
+const firedReminders = new Set<string>();
+let shortcutRegistered = false;
 let trayStatus: TrayStatus = {
   ready: false,
   canPunchIn: false,
@@ -77,10 +86,28 @@ function loadAutoUpdater(): AppUpdater | null {
   }
 }
 
+type ReminderConfig = {
+  /** "Still on the clock?" once today's scheduled hours are done. */
+  overtime: boolean;
+  /** "HH:MM" to nudge a punch-in on workdays, or null for off. */
+  startTime: string | null;
+};
+
 type AppConfig = {
   dataFilePath?: string;
   /** Whether the menu bar / tray icon is shown. Defaults to on. */
   showTray?: boolean;
+  reminders?: Partial<ReminderConfig>;
+  /** Global ⌥⌘P / Ctrl+Alt+P punch shortcut. Defaults to on. */
+  globalShortcut?: boolean;
+};
+
+type DesktopPreferences = {
+  reminders: ReminderConfig;
+  globalShortcut: boolean;
+  /** False when another app already owns the shortcut. */
+  globalShortcutActive: boolean;
+  notificationsSupported: boolean;
 };
 
 function readAppConfig(): AppConfig {
@@ -94,6 +121,53 @@ function readAppConfig(): AppConfig {
 
 function isTrayEnabled() {
   return readAppConfig().showTray !== false;
+}
+
+function getReminderConfig(config = readAppConfig()): ReminderConfig {
+  const startTime = config.reminders?.startTime;
+  return {
+    overtime: config.reminders?.overtime !== false,
+    startTime:
+      typeof startTime === "string" && /^\d{2}:\d{2}$/.test(startTime)
+        ? startTime
+        : null,
+  };
+}
+
+function getDesktopPreferences(): DesktopPreferences {
+  const config = readAppConfig();
+  return {
+    reminders: getReminderConfig(config),
+    globalShortcut: config.globalShortcut !== false,
+    globalShortcutActive: shortcutRegistered,
+    notificationsSupported: Notification.isSupported(),
+  };
+}
+
+function setDesktopPreferences(patch: {
+  reminders?: Partial<ReminderConfig>;
+  globalShortcut?: boolean;
+}) {
+  const config = readAppConfig();
+  const next: AppConfig = { ...config };
+  if (patch.reminders) {
+    next.reminders = {
+      ...getReminderConfig(config),
+      ...(typeof patch.reminders.overtime === "boolean"
+        ? { overtime: patch.reminders.overtime }
+        : {}),
+      ...("startTime" in patch.reminders
+        ? { startTime: patch.reminders.startTime ?? null }
+        : {}),
+    };
+  }
+  if (typeof patch.globalShortcut === "boolean") {
+    next.globalShortcut = patch.globalShortcut;
+  }
+  writeAppConfig(next);
+  applyGlobalShortcut();
+  checkReminders();
+  return getDesktopPreferences();
 }
 
 function writeAppConfig(config: AppConfig) {
@@ -426,6 +500,144 @@ function destroyTray() {
   tray = null;
 }
 
+function clockMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+/** Minutes on the clock today, counting a running session up to now. */
+function todayClockedMinutes() {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return trayStatus.todayEntries.reduce((total, entry) => {
+    const start = clockMinutes(entry.start);
+    const end = entry.end === null ? nowMinutes : clockMinutes(entry.end);
+    return total + (end >= start ? end - start : end + 1440 - start);
+  }, 0);
+}
+
+function formatMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${String(rest).padStart(2, "0")}m`;
+}
+
+function notify(options: {
+  title: string;
+  body: string;
+  action?: { label: string; onAction: () => void };
+}) {
+  if (!Notification.isSupported()) return;
+  const notification = new Notification({
+    title: options.title,
+    body: options.body,
+    silent: false,
+    // Action buttons only exist on macOS; elsewhere a click does the same.
+    actions: options.action
+      ? [{ type: "button", text: options.action.label }]
+      : [],
+  });
+  notification.on("action", () => options.action?.onAction());
+  notification.on("click", () => {
+    if (options.action && process.platform !== "darwin") {
+      options.action.onAction();
+    } else {
+      showMainWindow();
+    }
+  });
+  notification.show();
+}
+
+/**
+ * Runs every minute against the status the main window last reported:
+ * a nudge to punch in at the configured start time on workdays, and a
+ * "still on the clock?" once today's scheduled hours are done.
+ */
+function checkReminders() {
+  if (!trayStatus.ready || !trayStatus.todayKey) return;
+
+  const reminders = getReminderConfig();
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const dayKey = trayStatus.todayKey;
+  const isWorkday = trayStatus.targetHours > 0;
+
+  if (reminders.startTime && isWorkday) {
+    const firedKey = `start:${dayKey}`;
+    const sinceStart = nowMinutes - clockMinutes(reminders.startTime);
+    if (
+      !firedReminders.has(firedKey) &&
+      sinceStart >= 0 &&
+      sinceStart <= START_NUDGE_WINDOW_MINUTES &&
+      trayStatus.todayEntries.length === 0 &&
+      trayStatus.canPunchIn
+    ) {
+      firedReminders.add(firedKey);
+      notify({
+        title: "Time to punch in?",
+        body: `It's past ${reminders.startTime} and today's card is empty.`,
+        action: { label: "Punch in", onAction: sendTrayPunchToggle },
+      });
+    }
+  }
+
+  if (reminders.overtime && trayStatus.canPunchOut && isWorkday) {
+    const firedKey = `overtime:${dayKey}`;
+    const clocked = todayClockedMinutes();
+    if (
+      !firedReminders.has(firedKey) &&
+      clocked >= trayStatus.targetHours * 60
+    ) {
+      firedReminders.add(firedKey);
+      notify({
+        title: "Still on the clock?",
+        body: `You've clocked ${formatMinutes(clocked)} today, past the scheduled ${formatMinutes(Math.round(trayStatus.targetHours * 60))}. Punched in since ${trayStatus.sessionStart}.`,
+        action: { label: "Punch out", onAction: sendTrayPunchToggle },
+      });
+    }
+  }
+}
+
+function startReminderTimer() {
+  if (reminderTimer) return;
+  reminderTimer = setInterval(checkReminders, 60_000);
+  reminderTimer.unref();
+}
+
+/** Toggles the punch clock from anywhere and confirms with a notification. */
+function globalPunch() {
+  if (!trayStatus.ready || trayStatus.hasStaleSession) {
+    showMainWindow();
+    return;
+  }
+  const wasRunning = trayStatus.canPunchOut;
+  const clocked = todayClockedMinutes();
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  sendTrayPunchToggle();
+  notify({
+    title: wasRunning ? `Punched out at ${time}` : `Punched in at ${time}`,
+    body: wasRunning
+      ? `${formatMinutes(clocked)} on the clock today.`
+      : "The clock is running. Press the shortcut again to punch out.",
+  });
+}
+
+function applyGlobalShortcut() {
+  const wanted = readAppConfig().globalShortcut !== false;
+  if (wanted && !shortcutRegistered) {
+    try {
+      shortcutRegistered = globalShortcut.register(PUNCH_SHORTCUT, globalPunch);
+    } catch (error) {
+      console.error("Could not register the punch shortcut", error);
+      shortcutRegistered = false;
+    }
+  } else if (!wanted && shortcutRegistered) {
+    globalShortcut.unregister(PUNCH_SHORTCUT);
+    shortcutRegistered = false;
+  }
+}
+
 /** macOS app menu, so Punchboard gets the standard ⌘, for Settings. */
 function setupApplicationMenu() {
   if (process.platform !== "darwin") return;
@@ -491,6 +703,7 @@ function registerTrayIpcHandlers() {
     if (event.sender !== mainWindow?.webContents) return;
     trayStatus = status;
     updateTrayMenu();
+    checkReminders();
   });
 
   ipcMain.handle("tray:get-status", () => trayStatus);
@@ -516,6 +729,14 @@ function registerTrayIpcHandlers() {
 
   ipcMain.on("window:show", showMainWindow);
   ipcMain.handle("startup:get-config", getStartupConfig);
+  ipcMain.handle("desktop:get-preferences", getDesktopPreferences);
+  ipcMain.handle("desktop:set-preferences", (_event, patch: unknown) =>
+    setDesktopPreferences(
+      typeof patch === "object" && patch !== null
+        ? (patch as Parameters<typeof setDesktopPreferences>[0])
+        : {},
+    ),
+  );
   ipcMain.handle("tray:set-enabled", (_event, enabled: unknown) =>
     setShowTray(enabled === true),
   );
@@ -727,6 +948,8 @@ app.whenReady().then(() => {
 
   setupApplicationMenu();
   if (isTrayEnabled()) createTray();
+  applyGlobalShortcut();
+  startReminderTimer();
   setupAutoUpdates();
   const wasOpenedAtLogin = canConfigureLoginItem()
     ? app.getLoginItemSettings().wasOpenedAtLogin
@@ -743,6 +966,10 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {

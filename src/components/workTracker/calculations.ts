@@ -138,6 +138,8 @@ export interface DayResult {
   hours: number;
   /** Of `hours`, how many count as overtime. */
   overtimeHours: number;
+  /** Minutes on the clock from sessions, before the break (0 without sessions). */
+  clockedMinutes: number;
   breakMinutes: number;
   source: DaySource;
 }
@@ -254,6 +256,7 @@ export function computePeriod(
       exception,
       hours,
       overtimeHours: dayOvertime,
+      clockedMinutes: worked?.clockedMinutes ?? 0,
       breakMinutes: worked?.breakMinutes ?? 0,
       source,
     };

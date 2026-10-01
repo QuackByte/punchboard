@@ -28,6 +28,7 @@ import {
   getCurrentPayslipEndMonthKey,
   getDatesInPayslipRange,
   getInitialUiState,
+  keyToDate,
   minutesSinceMidnight,
   parseDayInput,
   parseMonthKey,
@@ -54,6 +55,43 @@ import {
   normalizeWorkRules,
   workedTime,
 } from "./calculations";
+import { useUndo } from "./useUndo";
+
+/** Sets or removes a key so restoring "nothing" really removes it. */
+function withKey<T>(record: Record<string, T>, key: string, value: T | undefined) {
+  if (value === undefined) {
+    const { [key]: _removed, ...rest } = record;
+    return rest;
+  }
+  return { ...record, [key]: value };
+}
+
+/**
+ * Settings are read when state is created rather than in an effect: the
+ * save effect would otherwise write the defaults back first (StrictMode
+ * runs effects twice in development, which made that stick).
+ */
+function readStoredSettings() {
+  try {
+    const raw = safeStorageGetItem(SETTINGS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<TrackerSettings>) : {};
+    return {
+      payslipStartDay: clampDay(parsed.payslipStartDay ?? 21),
+      workRules: normalizeWorkRules(parsed),
+    };
+  } catch {
+    safeStorageRemoveItem(SETTINGS_KEY);
+    return { payslipStartDay: 21, workRules: DEFAULT_WORK_RULES };
+  }
+}
+
+function describeDay(key: string) {
+  return keyToDate(key).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
 
 function parseDataFile(raw: string) {
   const payload = JSON.parse(raw) as DataFile;
@@ -102,8 +140,13 @@ export function useWorkTracker() {
     useState<boolean>(DEFAULT_CURRENCY_CONVERSION_ENABLED);
   const [taxPercent, setTaxPercent] = useState<number>(0);
   const [extraDeduction, setExtraDeduction] = useState<number>(0);
-  const [payslipStartDay, setPayslipStartDay] = useState<number>(21);
-  const [workRules, setWorkRules] = useState<WorkRules>(DEFAULT_WORK_RULES);
+  const [storedSettings] = useState(readStoredSettings);
+  const [payslipStartDay, setPayslipStartDay] = useState<number>(
+    storedSettings.payslipStartDay,
+  );
+  const [workRules, setWorkRules] = useState<WorkRules>(
+    storedSettings.workRules,
+  );
   const trackerSettings = useMemo<TrackerSettings>(
     () => ({ payslipStartDay, ...workRules }),
     [payslipStartDay, workRules],
@@ -132,69 +175,12 @@ export function useWorkTracker() {
   const [browserFileNeedsPermission, setBrowserFileNeedsPermission] =
     useState(false);
   const [browserFileError, setBrowserFileError] = useState<string | null>(null);
-  const [startupAvailable, setStartupAvailable] = useState(false);
-  const [openAtLogin, setOpenAtLogin] = useState(false);
-  const [showTray, setShowTray] = useState(true);
-  const [startupError, setStartupError] = useState<string | null>(null);
   const [trayPunchPending, setTrayPunchPending] = useState(false);
   const [fileLoadVersion, setFileLoadVersion] = useState(0);
   const activeBrowserFileHandleRef =
     useRef<BrowserDataFileHandle | null>(null);
   const browserFileContentsRef = useRef<string | null>(null);
   const browserFileWriteBlockedRef = useRef(false);
-
-  useEffect(() => {
-    const desktop = window.desktop;
-    if (!desktop?.isElectron) return;
-    let active = true;
-    const unsubscribe = desktop.onOpenAtLoginChanged(setOpenAtLogin);
-    void desktop
-      .getStartupConfig()
-      .then((config) => {
-        if (!active) return;
-        setStartupAvailable(config.available);
-        setOpenAtLogin(config.openAtLogin);
-        setShowTray(config.showTray);
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setStartupError(
-            error instanceof Error ? error.message : "Could not load startup setting.",
-          );
-        }
-      });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
-
-  const changeOpenAtLogin = useCallback(async (enabled: boolean) => {
-    if (!window.desktop?.isElectron) return;
-    setStartupError(null);
-    try {
-      const result = await window.desktop.setOpenAtLogin(enabled);
-      setOpenAtLogin(result.openAtLogin);
-      setStartupError(result.message ?? null);
-    } catch (error) {
-      setStartupError(
-        error instanceof Error ? error.message : "Could not update startup setting.",
-      );
-    }
-  }, []);
-
-  const changeShowTray = useCallback(async (enabled: boolean) => {
-    if (!window.desktop?.isElectron) return;
-    setStartupError(null);
-    try {
-      const result = await window.desktop.setShowTray(enabled);
-      setShowTray(result.showTray);
-    } catch (error) {
-      setStartupError(
-        error instanceof Error ? error.message : "Could not update the tray setting.",
-      );
-    }
-  }, []);
 
   const addActivity = (type: ActivityType, message: string) => {
     const entry: ActivityLogEntry = {
@@ -626,17 +612,6 @@ export function useWorkTracker() {
 
   useEffect(() => {
     if (isFileMode) return;
-
-    const rawSettings = safeStorageGetItem(SETTINGS_KEY);
-    if (rawSettings) {
-      try {
-        const parsed = JSON.parse(rawSettings) as Partial<TrackerSettings>;
-        setPayslipStartDay(clampDay(parsed.payslipStartDay ?? 21));
-        setWorkRules(normalizeWorkRules(parsed));
-      } catch {
-        safeStorageRemoveItem(SETTINGS_KEY);
-      }
-    }
 
     const rawLog = safeStorageGetItem(ACTIVITY_LOG_KEY);
     if (rawLog) {
@@ -1209,10 +1184,37 @@ export function useWorkTracker() {
     );
   };
 
+  const { undoOffer, offerUndo, undo, dismissUndo } = useUndo();
+
+  // Undo restores into the loaded month, so an offer can't outlive it.
+  useEffect(() => {
+    dismissUndo();
+  }, [monthKey, dismissUndo]);
+
+  /** Captures everything stored for a day and returns a function restoring it. */
+  const snapshotDay = (key: string) => {
+    const snapshot = {
+      entries: timeEntries[key],
+      daily: dailyHours[key],
+      extra: extraHours[key],
+      exception: exceptions[key],
+    };
+    const isEmpty = Object.values(snapshot).every((value) => value === undefined);
+    const restore = () => {
+      setTimeEntries((previous) => withKey(previous, key, snapshot.entries));
+      setDailyHours((previous) => withKey(previous, key, snapshot.daily));
+      setExtraHours((previous) => withKey(previous, key, snapshot.extra));
+      setExceptions((previous) => withKey(previous, key, snapshot.exception));
+      addActivity("hours-change", `Undid change on ${key}`);
+    };
+    return { isEmpty, restore };
+  };
+
   const setDayException = (key: string, type: ExceptionType | "none") => {
     if (!workingDateLookup.has(key)) {
       return;
     }
+    const { restore } = snapshotDay(key);
 
     // Logged outside the state updater so StrictMode's double-invoke
     // doesn't record the change twice.
@@ -1229,6 +1231,12 @@ export function useWorkTracker() {
     addActivity(
       "exception-change",
       clearing ? `Cleared mark on ${key}` : `Marked ${key} as ${type}`,
+    );
+    offerUndo(
+      clearing
+        ? `Cleared ${describeDay(key)}`
+        : `${describeDay(key)} marked ${type}`,
+      restore,
     );
   };
 
@@ -1326,6 +1334,7 @@ export function useWorkTracker() {
 
   /** Drops any override so a workday falls back to the scheduled hours. */
   const resetDay = (key: string) => {
+    const { isEmpty, restore } = snapshotDay(key);
     setTimeEntries((previous) => {
       const { [key]: _removed, ...rest } = previous;
       return rest;
@@ -1339,6 +1348,32 @@ export function useWorkTracker() {
       return rest;
     });
     addActivity("hours-change", `Reset ${key} to schedule`);
+    if (!isEmpty) {
+      offerUndo(
+        workingDateLookup.has(key)
+          ? `${describeDay(key)} reset to schedule`
+          : `${describeDay(key)} cleared`,
+        restore,
+      );
+    }
+  };
+
+  /** Deletes one session from a day, with undo. */
+  const removeSession = (key: string, index: number) => {
+    const entries = timeEntries[key] ?? [];
+    const removed = entries[index];
+    if (!removed) {
+      return;
+    }
+    const { restore } = snapshotDay(key);
+    setDayEntries(
+      key,
+      entries.filter((_, i) => i !== index),
+    );
+    offerUndo(
+      `Removed ${removed.start}–${removed.end ?? "now"} on ${describeDay(key)}`,
+      restore,
+    );
   };
 
   /**
@@ -1350,10 +1385,14 @@ export function useWorkTracker() {
     if (!parsed) {
       return false;
     }
+    const { isEmpty, restore } = snapshotDay(key);
     if (parsed.kind === "sessions") {
       setDayEntries(key, parsed.entries);
     } else {
       setDayTotal(key, parsed.hours);
+    }
+    if (!isEmpty) {
+      offerUndo(`${describeDay(key)} replaced`, restore);
     }
     return true;
   };
@@ -1762,15 +1801,13 @@ export function useWorkTracker() {
     reloadBrowserDataFile,
     overwriteBrowserDataFile,
     disconnectBrowserDataFile,
-    startupAvailable,
-    openAtLogin,
-    startupError,
-    changeOpenAtLogin,
     period,
     pay,
     workRules,
     onWorkRulesChange,
-    showTray,
-    changeShowTray,
+    removeSession,
+    undoOffer,
+    undo,
+    dismissUndo,
   };
 }
