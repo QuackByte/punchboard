@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.9.0...punchboard-v1.9.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* macOS updates never installing after Restart now ([#37](https://github.com/QuackByte/punchboard/issues/37)) ([8b5ee33](https://github.com/QuackByte/punchboard/commit/8b5ee33a127cd2faa709e0505b09806453161ec5))
+
 ## [1.9.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.8.0...punchboard-v1.9.0) (2026-10-01)
 
 
