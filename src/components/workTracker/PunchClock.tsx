@@ -21,6 +21,13 @@ interface PunchClockProps {
   onPunchOut: () => void;
   onGoToCurrentPeriod: () => void;
   onEditDay: (key: string) => void;
+  /** Top-left label; the tray popover swaps in the app name. */
+  label?: React.ReactNode;
+  className?: string;
+  /** Extra row under the main button (used by the tray popover). */
+  footer?: React.ReactNode;
+  /** Smaller clock digits for the tray popover. */
+  compact?: boolean;
 }
 
 export default function PunchClock({
@@ -33,6 +40,10 @@ export default function PunchClock({
   onPunchOut,
   onGoToCurrentPeriod,
   onEditDay,
+  label = "01 · Punch clock",
+  className,
+  footer,
+  compact = false,
 }: PunchClockProps) {
   const now = useNow(1000);
   const nowMinutes = minutesSinceMidnight(now);
@@ -54,7 +65,10 @@ export default function PunchClock({
   return (
     <section
       aria-label="Punch clock"
-      className="relative flex flex-col overflow-hidden rounded-2xl border border-ink-border bg-ink p-5 text-ink-foreground shadow-[0_20px_50px_-24px_hsl(var(--ink)/0.8)]"
+      className={cn(
+        "relative flex flex-col overflow-hidden rounded-2xl border border-ink-border bg-ink p-5 text-ink-foreground shadow-[0_20px_50px_-24px_hsl(var(--ink)/0.8)]",
+        className,
+      )}
     >
       {/* Brand glow behind the digits */}
       <div
@@ -67,7 +81,7 @@ export default function PunchClock({
 
       <div className="relative flex items-center justify-between">
         <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.14em] text-ink-muted">
-          01 · Punch clock
+          {label}
         </span>
         <span className="font-mono text-[11px] text-ink-muted">
           {now.toLocaleDateString("en-GB", {
@@ -79,7 +93,12 @@ export default function PunchClock({
       </div>
 
       <div className="relative mt-4 flex items-baseline font-mono tabular leading-none">
-        <span className="text-[56px] font-semibold tracking-tight">
+        <span
+          className={cn(
+            "font-semibold tracking-tight",
+            compact ? "text-[44px]" : "text-[56px]",
+          )}
+        >
           {hh}
           <span
             className={cn(
@@ -193,6 +212,8 @@ export default function PunchClock({
           </PunchButton>
         )}
       </div>
+
+      {footer ? <div className="relative mt-3">{footer}</div> : null}
     </section>
   );
 }

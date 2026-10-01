@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  screen,
   Tray,
 } from "electron";
 import path from "node:path";
@@ -21,16 +22,27 @@ const __dirname = path.dirname(__filename);
 const APP_CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
+type TimeEntry = { start: string; end: string | null };
+
 type TrayStatus = {
   ready: boolean;
   canPunchIn: boolean;
   canPunchOut: boolean;
   hasStaleSession: boolean;
   sessionStart: string | null;
+  /** Today's sessions and schedule, so the tray popover can mirror the punch clock. */
+  todayKey: string;
+  todayEntries: TimeEntry[];
+  targetHours: number;
+  openSession: { key: string; entry: TimeEntry } | null;
 };
 
+const TRAY_WINDOW_WIDTH = 340;
+
 let mainWindow: BrowserWindow | null = null;
+let trayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let trayTitleTimer: NodeJS.Timeout | null = null;
 let isQuitting = false;
 let trayStatus: TrayStatus = {
   ready: false,
@@ -38,6 +50,10 @@ let trayStatus: TrayStatus = {
   canPunchOut: false,
   hasStaleSession: false,
   sessionStart: null,
+  todayKey: "",
+  todayEntries: [],
+  targetHours: 0,
+  openSession: null,
 };
 
 type AutoUpdaterEvents = {
@@ -141,15 +157,14 @@ function sendTrayPunchToggle() {
     !mainWindow ||
     mainWindow.isDestroyed()
   ) {
+    trayWindow?.hide();
     showMainWindow();
     return;
   }
   mainWindow.webContents.send("tray:punch-toggle");
 }
 
-function updateTrayMenu() {
-  if (!tray) return;
-
+function buildTrayMenu() {
   const canPunch = trayStatus.canPunchIn || trayStatus.canPunchOut;
   const punchLabel = trayStatus.hasStaleSession
     ? "Open Punchboard to resolve open session"
@@ -159,59 +174,232 @@ function updateTrayMenu() {
         ? "Punch in"
         : "Punch clock unavailable";
 
+  return Menu.buildFromTemplate([
+    {
+      label: punchLabel,
+      enabled: canPunch,
+      click: sendTrayPunchToggle,
+    },
+    { type: "separator" },
+    { label: "Open Punchboard", click: showMainWindow },
+    {
+      label: "Open at Login",
+      type: "checkbox",
+      checked: getStartupConfig().openAtLogin,
+      enabled: canConfigureLoginItem(),
+      click: (item) => {
+        setOpenAtLogin(item.checked);
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Quit Punchboard",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
+/** Minutes elapsed since an "HH:MM" start today (wrapping past midnight). */
+function minutesSince(start: string) {
+  const [hours, minutes] = start.split(":").map(Number);
+  const now = new Date();
+  const elapsed =
+    now.getHours() * 60 + now.getMinutes() - (hours * 60 + minutes);
+  return elapsed >= 0 ? elapsed : elapsed + 1440;
+}
+
+/**
+ * On macOS the elapsed time of a running session sits next to the menu bar
+ * icon, like a stopwatch. Other platforms show it in the tooltip.
+ */
+function updateTrayTitle() {
+  if (!tray) return;
+
+  const running = trayStatus.canPunchOut && trayStatus.sessionStart;
+  const elapsed = running ? minutesSince(trayStatus.sessionStart!) : 0;
+  const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+
+  if (process.platform === "darwin") {
+    tray.setTitle(running ? ` ${elapsedLabel}` : "", {
+      fontType: "monospacedDigit",
+    });
+  }
   tray.setToolTip(
-    trayStatus.canPunchOut
-      ? `Punchboard · On the clock since ${trayStatus.sessionStart ?? "now"}`
+    running
+      ? `Punchboard · On the clock since ${trayStatus.sessionStart} (${elapsedLabel})`
       : "Punchboard",
   );
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: punchLabel,
-        enabled: canPunch,
-        click: sendTrayPunchToggle,
-      },
-      { type: "separator" },
-      { label: "Open Punchboard", click: showMainWindow },
-      {
-        label: "Open at Login",
-        type: "checkbox",
-        checked: getStartupConfig().openAtLogin,
-        enabled: canConfigureLoginItem(),
-        click: (item) => {
-          setOpenAtLogin(item.checked);
-        },
-      },
-      { type: "separator" },
-      {
-        label: "Quit Punchboard",
-        click: () => {
-          isQuitting = true;
-          app.quit();
-        },
-      },
-    ]),
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+
+  // macOS and Windows open the popover on click and the menu on right-click;
+  // Linux trays don't reliably report clicks, so they keep a plain menu.
+  if (process.platform === "linux") {
+    tray.setContextMenu(buildTrayMenu());
+  }
+
+  updateTrayTitle();
+  if (trayStatus.canPunchOut && !trayTitleTimer) {
+    trayTitleTimer = setInterval(updateTrayTitle, 15_000);
+  } else if (!trayStatus.canPunchOut && trayTitleTimer) {
+    clearInterval(trayTitleTimer);
+    trayTitleTimer = null;
+  }
+
+  if (trayWindow && !trayWindow.isDestroyed()) {
+    trayWindow.webContents.send("tray:status", trayStatus);
+  }
+}
+
+function getTrayIconPath(fileName: string) {
+  return app.isPackaged
+    ? path.join(__dirname, "../public/tray", fileName)
+    : path.join(process.cwd(), "public/tray", fileName);
+}
+
+function loadTrayIcon() {
+  if (process.platform === "darwin") {
+    // Template images are tinted by macOS, so they match light and dark
+    // menu bars (and the highlighted state) automatically.
+    const icon = nativeImage.createFromPath(
+      getTrayIconPath("trayTemplate.png"),
+    );
+    icon.setTemplateImage(true);
+    return icon;
+  }
+
+  const icon = nativeImage.createEmpty();
+  for (const [scaleFactor, fileName] of [
+    [1, "tray.png"],
+    [2, "tray@2x.png"],
+    [3, "tray@3x.png"],
+  ] as const) {
+    icon.addRepresentation({
+      scaleFactor,
+      buffer: fs.readFileSync(getTrayIconPath(fileName)),
+    });
+  }
+  return icon;
+}
+
+function createTrayWindow() {
+  if (trayWindow && !trayWindow.isDestroyed()) return trayWindow;
+
+  const window = new BrowserWindow({
+    width: TRAY_WINDOW_WIDTH,
+    height: 360,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    transparent: true,
+    hasShadow: true,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  trayWindow = window;
+
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  window.on("blur", () => window.hide());
+  window.on("closed", () => {
+    if (trayWindow === window) trayWindow = null;
+  });
+
+  const rendererUrl = process.env.ELECTRON_RENDERER_URL;
+  if (rendererUrl) {
+    window.loadURL(`${rendererUrl}#tray`);
+  } else {
+    window.loadFile(path.join(__dirname, "../dist/index.html"), {
+      hash: "tray",
+    });
+  }
+  return window;
+}
+
+/** Places the popover under the menu bar icon (or above a bottom taskbar). */
+function positionTrayWindow(window: BrowserWindow) {
+  if (!tray) return;
+
+  const trayBounds = tray.getBounds();
+  const windowBounds = window.getBounds();
+  const { workArea } = screen.getDisplayNearestPoint({
+    x: Math.round(trayBounds.x + trayBounds.width / 2),
+    y: Math.round(trayBounds.y + trayBounds.height / 2),
+  });
+
+  const trayIsAtBottom = trayBounds.y > workArea.y + workArea.height / 2;
+  const x = Math.round(
+    Math.min(
+      Math.max(
+        trayBounds.x + trayBounds.width / 2 - windowBounds.width / 2,
+        workArea.x + 8,
+      ),
+      workArea.x + workArea.width - windowBounds.width - 8,
+    ),
   );
+  const y = trayIsAtBottom
+    ? Math.round(trayBounds.y - windowBounds.height - 6)
+    : Math.round(Math.max(trayBounds.y + trayBounds.height + 6, workArea.y + 6));
+
+  window.setPosition(x, y, false);
+}
+
+function toggleTrayWindow() {
+  const window = createTrayWindow();
+  if (window.isVisible()) {
+    window.hide();
+    return;
+  }
+
+  const show = () => {
+    positionTrayWindow(window);
+    window.show();
+    window.focus();
+    window.webContents.send("tray:status", trayStatus);
+  };
+  if (window.webContents.isLoading()) {
+    window.webContents.once("did-finish-load", show);
+  } else {
+    show();
+  }
 }
 
 function createTray() {
   if (tray) return;
 
   try {
-    const trayIcon =
-      process.platform === "darwin"
-        ? nativeImage
-            .createFromDataURL(
-              `data:image/svg+xml;base64,${Buffer.from(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="#000" stroke-width="1.7"/><path d="M9 4.5v4.8l3.1 1.8" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/></svg>',
-              ).toString("base64")}`,
-            )
-            .resize({ width: 18, height: 18 })
-        : loadAppIcon(getAppIconPath()).resize({ width: 16, height: 16 });
-    if (process.platform === "darwin") trayIcon.setTemplateImage(true);
-    tray = new Tray(trayIcon);
-    tray.on("double-click", showMainWindow);
+    tray = new Tray(loadTrayIcon());
+    tray.setIgnoreDoubleClickEvents(true);
+    if (process.platform !== "linux") {
+      tray.on("click", toggleTrayWindow);
+      tray.on("right-click", () => {
+        trayWindow?.hide();
+        tray?.popUpContextMenu(buildTrayMenu());
+      });
+      // Load the popover up front so the first click opens instantly.
+      createTrayWindow();
+    }
     updateTrayMenu();
+
+    if (!app.isPackaged) {
+      // Lets automated checks open the popover without a real tray click.
+      (globalThis as { __punchboardToggleTray?: () => void }).__punchboardToggleTray =
+        toggleTrayWindow;
+    }
   } catch (error) {
     console.error("Could not create the Punchboard tray icon", error);
   }
@@ -222,6 +410,27 @@ function registerTrayIpcHandlers() {
     if (event.sender !== mainWindow?.webContents) return;
     trayStatus = status;
     updateTrayMenu();
+  });
+
+  ipcMain.handle("tray:get-status", () => trayStatus);
+  ipcMain.on("tray:punch", (event) => {
+    if (event.sender !== trayWindow?.webContents) return;
+    sendTrayPunchToggle();
+  });
+  ipcMain.on("tray:open-main", () => {
+    trayWindow?.hide();
+    showMainWindow();
+  });
+  ipcMain.on("tray:show-menu", () => {
+    trayWindow?.hide();
+    tray?.popUpContextMenu(buildTrayMenu());
+  });
+  ipcMain.on("tray:resize", (event, height: unknown) => {
+    if (event.sender !== trayWindow?.webContents) return;
+    if (typeof height !== "number" || !Number.isFinite(height)) return;
+    const nextHeight = Math.min(Math.max(Math.ceil(height), 200), 640);
+    trayWindow.setSize(TRAY_WINDOW_WIDTH, nextHeight, false);
+    if (trayWindow.isVisible()) positionTrayWindow(trayWindow);
   });
 
   ipcMain.on("window:show", showMainWindow);

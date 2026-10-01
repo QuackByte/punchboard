@@ -1482,7 +1482,8 @@ export function useWorkTracker() {
       return;
     }
     setTrayPunchPending(false);
-    if (!openSession) punchIn();
+    if (openSession?.key === todayKey) punchOut();
+    else if (!openSession) punchIn();
   }, [
     currentPeriodMonthKey,
     hydratedMonthKey,
@@ -1490,19 +1491,85 @@ export function useWorkTracker() {
     isViewingCurrentPeriod,
     openSession,
     punchIn,
+    punchOut,
+    todayKey,
     trayPunchPending,
+  ]);
+
+  /**
+   * Today's punch-clock state for the tray. While another month is open in
+   * the main window, it comes from the saved current-period data instead.
+   */
+  const trayToday = useMemo(() => {
+    if (isViewingCurrentPeriod) {
+      return {
+        entries: timeEntries[todayKey] ?? [],
+        targetHours:
+          workingDateLookup.has(todayKey) && !exceptions[todayKey]
+            ? hoursPerDay
+            : 0,
+        openSession: openSession
+          ? { key: openSession.key, entry: openSession.entry }
+          : null,
+      };
+    }
+
+    let stored: Partial<TrackerData> = {};
+    try {
+      stored = JSON.parse(
+        safeStorageGetItem(`tracker-${currentPeriodMonthKey}`) ?? "{}",
+      ) as Partial<TrackerData>;
+    } catch {
+      // fall back to the default schedule below
+    }
+    const storedEntries = stored.timeEntries ?? {};
+    const days = stored.selectedDays ?? ["mon", "tue", "wed", "thu", "fri"];
+    let storedOpen: { key: string; entry: TimeEntry } | null = null;
+    for (const [key, entries] of Object.entries(storedEntries)) {
+      const entry = entries.find((candidate) => candidate.end === null);
+      if (entry) {
+        storedOpen = { key, entry };
+        break;
+      }
+    }
+
+    return {
+      entries: storedEntries[todayKey] ?? [],
+      targetHours:
+        days.includes(weekdayMap[today.getDay()]) &&
+        !stored.exceptions?.[todayKey]
+          ? (stored.hoursPerDay ?? 8)
+          : 0,
+      openSession: storedOpen,
+    };
+    // `today` changes identity every render; todayKey captures the date.
+  }, [
+    isViewingCurrentPeriod,
+    timeEntries,
+    todayKey,
+    workingDateLookup,
+    exceptions,
+    hoursPerDay,
+    openSession,
+    currentPeriodMonthKey,
+    lastSavedAt,
   ]);
 
   useEffect(() => {
     if (!window.desktop?.isElectron) return;
+    const trayOpen = trayToday.openSession;
     window.desktop.updateTrayStatus({
       ready: fileInitialized,
-      canPunchIn: fileInitialized && !openSession,
-      canPunchOut: fileInitialized && openSession?.key === todayKey,
-      hasStaleSession: !!openSession && openSession.key !== todayKey,
-      sessionStart: openSession?.entry.start ?? null,
+      canPunchIn: fileInitialized && !trayOpen,
+      canPunchOut: fileInitialized && trayOpen?.key === todayKey,
+      hasStaleSession: !!trayOpen && trayOpen.key !== todayKey,
+      sessionStart: trayOpen?.entry.start ?? null,
+      todayKey,
+      todayEntries: trayToday.entries,
+      targetHours: trayToday.targetHours,
+      openSession: trayOpen,
     });
-  }, [fileInitialized, openSession, todayKey]);
+  }, [fileInitialized, trayToday, todayKey]);
 
   const goToCurrentPeriod = () => {
     handleMonthChange(currentPeriodMonthKey);

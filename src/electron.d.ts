@@ -25,6 +25,14 @@ export interface TrayStatus {
   canPunchOut: boolean;
   hasStaleSession: boolean;
   sessionStart: string | null;
+  todayKey: string;
+  todayEntries: Array<{ start: string; end: string | null }>;
+  /** Scheduled hours for today (0 when it isn't a workday). */
+  targetHours: number;
+  openSession: {
+    key: string;
+    entry: { start: string; end: string | null };
+  } | null;
 }
 
 export interface DesktopAPI {
@@ -34,6 +42,12 @@ export interface DesktopAPI {
   onOpenAtLoginChanged(listener: (enabled: boolean) => void): () => void;
   updateTrayStatus(status: TrayStatus): void;
   showMainWindow(): void;
+  getTrayStatus(): Promise<TrayStatus>;
+  onTrayStatus(listener: (status: TrayStatus) => void): () => void;
+  requestTrayPunch(): void;
+  openMainFromTray(): void;
+  showTrayMenu(): void;
+  resizeTray(height: number): void;
   getStartupConfig(): Promise<{ available: boolean; openAtLogin: boolean }>;
   setOpenAtLogin(enabled: boolean): Promise<{
     success: boolean;
