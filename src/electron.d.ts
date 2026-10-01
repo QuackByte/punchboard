@@ -19,8 +19,31 @@ export interface UpdateAPI {
   check(): Promise<UpdateCheckResult>;
 }
 
+export interface TrayStatus {
+  ready: boolean;
+  canPunchIn: boolean;
+  canPunchOut: boolean;
+  hasStaleSession: boolean;
+  sessionStart: string | null;
+}
+
+export interface DesktopAPI {
+  isElectron: true;
+  platform: string;
+  onTrayPunchToggle(listener: () => void): () => void;
+  updateTrayStatus(status: TrayStatus): void;
+  showMainWindow(): void;
+  getStartupConfig(): Promise<{ available: boolean; openAtLogin: boolean }>;
+  setOpenAtLogin(enabled: boolean): Promise<{
+    success: boolean;
+    openAtLogin: boolean;
+    message?: string;
+  }>;
+}
+
 declare global {
   interface Window {
+    desktop?: DesktopAPI;
     fileAPI?: FileAPI;
     updateAPI?: UpdateAPI;
   }

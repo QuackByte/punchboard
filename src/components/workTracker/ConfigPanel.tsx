@@ -71,6 +71,10 @@ interface ConfigPanelProps {
   onReloadBrowserFile: () => void;
   onOverwriteBrowserFile: () => void;
   onDisconnectBrowserFile: () => void;
+  startupAvailable: boolean;
+  openAtLogin: boolean;
+  startupError: string | null;
+  onOpenAtLoginChange: (enabled: boolean) => void;
 }
 
 function Section({
@@ -162,6 +166,10 @@ export default function ConfigPanel({
   onReloadBrowserFile,
   onOverwriteBrowserFile,
   onDisconnectBrowserFile,
+  startupAvailable,
+  openAtLogin,
+  startupError,
+  onOpenAtLoginChange,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -419,6 +427,27 @@ export default function ConfigPanel({
             </div>
           ) : null}
         </Section>
+
+        {startupAvailable ? (
+          <Section title="Desktop app">
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3">
+              <div className="space-y-1">
+                <Label htmlFor="open-at-login">Open at login</Label>
+                <p className="text-xs text-muted-foreground">
+                  Start Punchboard when you sign in.
+                </p>
+              </div>
+              <Switch
+                id="open-at-login"
+                checked={openAtLogin}
+                onCheckedChange={onOpenAtLoginChange}
+              />
+            </div>
+            {startupError ? (
+              <p className="text-xs text-destructive">{startupError}</p>
+            ) : null}
+          </Section>
+        ) : null}
 
         <Section title="Schedule">
           <div>
