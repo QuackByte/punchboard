@@ -109,7 +109,47 @@ const isFileMode = !!window.fileAPI?.isElectron;
 
 export function useWorkTracker() {
   const initialUiState = getInitialUiState();
-  const today = new Date();
+  const [today, setToday] = useState(() => new Date());
+
+  useEffect(() => {
+    let midnightTimeout: number;
+
+    const scheduleMidnightUpdate = () => {
+      window.clearTimeout(midnightTimeout);
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+      );
+      midnightTimeout = window.setTimeout(
+        syncToday,
+        nextMidnight.getTime() - now.getTime() + 10,
+      );
+    };
+
+    const syncToday = () => {
+      const now = new Date();
+      setToday((previous) =>
+        dateKey(previous) === dateKey(now) ? previous : now,
+      );
+      scheduleMidnightUpdate();
+    };
+
+    const syncWhenVisible = () => {
+      if (document.visibilityState === "visible") syncToday();
+    };
+
+    scheduleMidnightUpdate();
+    window.addEventListener("focus", syncToday);
+    document.addEventListener("visibilitychange", syncWhenVisible);
+
+    return () => {
+      window.clearTimeout(midnightTimeout);
+      window.removeEventListener("focus", syncToday);
+      document.removeEventListener("visibilitychange", syncWhenVisible);
+    };
+  }, []);
 
   const DEFAULT_HOURLY_RATE = 15;
   const DEFAULT_TAX_PERCENT = 0;
