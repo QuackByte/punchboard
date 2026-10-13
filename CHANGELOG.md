@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.11.0...punchboard-v1.12.0) (2026-10-13)
+
+
+### Features
+
+* show Punchboard in the macOS Dock ([#41](https://github.com/QuackByte/punchboard/issues/41)) ([6a0dc4e](https://github.com/QuackByte/punchboard/commit/6a0dc4eaa285d3efad0718095e3913a2be89ba40))
+
 ## [1.11.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.10.0...punchboard-v1.11.0) (2026-10-06)
 
 
