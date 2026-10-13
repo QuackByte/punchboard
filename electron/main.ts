@@ -430,7 +430,13 @@ function createTrayWindow() {
   });
   trayWindow = window;
 
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // visibleOnFullScreen turns the app into a menu-bar-only (UIElement)
+  // process on macOS, which removes it from the Dock. Skip that so the full
+  // app keeps its Dock icon.
+  window.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+    skipTransformProcessType: true,
+  });
   window.on("blur", () => window.hide());
   window.on("closed", () => {
     if (trayWindow === window) trayWindow = null;
