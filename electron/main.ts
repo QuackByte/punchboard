@@ -203,12 +203,13 @@ function getStartupConfig() {
 
 function applyLoginItemSettings(enabled: boolean) {
   // Starting hidden only makes sense when the tray icon is there to reopen
-  // the window from.
+  // the window from. macOS has no login-item option for this, so it is
+  // detected at startup via wasOpenedAtLogin instead.
   const startHidden = enabled && isTrayEnabled();
   app.setLoginItemSettings({
     openAtLogin: enabled,
     ...(process.platform === "darwin"
-      ? { openAsHidden: startHidden }
+      ? {}
       : { args: startHidden ? ["--hidden"] : [] }),
   });
 }
