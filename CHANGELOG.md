@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.12.0...punchboard-v1.13.0) (2026-10-21)
+
+
+### Features
+
+* hide the Dock icon while Punchboard is in the menu bar ([#43](https://github.com/QuackByte/punchboard/issues/43)) ([c494164](https://github.com/QuackByte/punchboard/commit/c494164743db56da1040fec18cb3bca700744355))
+
 ## [1.12.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.11.0...punchboard-v1.12.0) (2026-10-13)
 
 
