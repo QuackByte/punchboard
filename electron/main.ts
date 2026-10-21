@@ -220,6 +220,7 @@ function setShowTray(enabled: boolean) {
   } else {
     destroyTray();
   }
+  syncDockIcon();
   if (canConfigureLoginItem() && app.getLoginItemSettings().openAtLogin) {
     applyLoginItemSettings(true);
   }
@@ -867,6 +868,20 @@ function getAppIconPath() {
     : path.join(process.cwd(), "public/punchboard_icon.svg");
 }
 
+// While the main window is hidden to the tray, Punchboard lives in the menu
+// bar only, so it drops its Dock icon. Without the tray the Dock icon is the
+// only way back in, so it always stays.
+function syncDockIcon() {
+  if (!app.dock) return;
+  const windowVisible =
+    mainWindow !== null && !mainWindow.isDestroyed() && mainWindow.isVisible();
+  if (windowVisible || !tray) {
+    void app.dock.show();
+  } else {
+    app.dock.hide();
+  }
+}
+
 function createMainWindow(showOnReady = true) {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
 
@@ -896,6 +911,8 @@ function createMainWindow(showOnReady = true) {
       window.hide();
     }
   });
+  window.on("show", () => syncDockIcon());
+  window.on("hide", () => syncDockIcon());
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
@@ -999,6 +1016,7 @@ app.whenReady().then(() => {
     tray !== null &&
     (process.argv.includes("--hidden") || wasOpenedAtLogin);
   createMainWindow(!shouldStartHidden);
+  syncDockIcon();
 
   app.on("activate", () => {
     showMainWindow();
