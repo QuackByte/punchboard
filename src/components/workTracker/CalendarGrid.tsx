@@ -43,6 +43,8 @@ interface CalendarGridProps {
   timeEntries: Record<string, TimeEntry[]>;
   hoursPerDay: number;
   workRules: WorkRules;
+  /** Carried balance after each week, by the week's Monday key. */
+  weekBalances: Record<string, number>;
   today: Date;
   /** Bumped to move keyboard focus to today's cell. */
   focusTodayRequest: number;
@@ -150,6 +152,7 @@ export default function CalendarGrid({
   timeEntries,
   hoursPerDay,
   workRules,
+  weekBalances,
   today,
   focusTodayRequest,
   editingKey,
@@ -439,6 +442,17 @@ export default function CalendarGrid({
 
         {chunkIntoWeeks(cells).map((week, weekIndex) => {
           const firstDate = week.find((cell): cell is Date => cell !== null);
+          const balance = firstDate
+            ? weekBalances[
+                dateKey(
+                  new Date(
+                    firstDate.getFullYear(),
+                    firstDate.getMonth(),
+                    firstDate.getDate() - ((firstDate.getDay() + 6) % 7),
+                  ),
+                )
+              ]
+            : undefined;
           const weekTotal = week.reduce((total, cell) => {
             if (!cell) {
               return total;
@@ -477,6 +491,20 @@ export default function CalendarGrid({
                         )}
                       >
                         /{formatDuration(weekScheduled)}
+                      </span>
+                    ) : null}
+                    {balance !== undefined && Math.abs(balance) >= 1 / 60 ? (
+                      <span
+                        title="Hours carried so far"
+                        className={cn(
+                          "mt-0.5 rounded-full px-1.5 font-mono text-[9.5px] tabular",
+                          balance > 0
+                            ? "bg-primary/10 text-primary"
+                            : "bg-vacation/15 text-[hsl(32_90%_32%)] dark:text-vacation",
+                        )}
+                      >
+                        {balance > 0 ? "+" : "−"}
+                        {formatDuration(Math.abs(balance))}
                       </span>
                     ) : null}
                   </>

@@ -61,6 +61,22 @@ export type ActivityType =
   | "value-change"
   | "hours-change";
 
+/**
+ * A fixed salary, entered either as an hourly rate over contracted weekly
+ * hours or as a yearly amount. It's paid the same every payslip period
+ * whatever hours are logged; hours still show the balance and overtime.
+ */
+export interface SalarySettings {
+  enabled: boolean;
+  basis: "weekly" | "yearly";
+  /** Contracted hours per week (0 = not set yet). */
+  weeklyHours: number;
+  /** Gross per year, used when the basis is "yearly". */
+  yearlyAmount: number;
+  /** Pay overtime on top of the salary; otherwise it's tracked but unpaid. */
+  overtimePaid: boolean;
+}
+
 export interface TrackerData {
   selectedDays: DayKey[];
   hoursPerDay: number;
@@ -81,6 +97,8 @@ export interface TrackerData {
    * by older versions that only know about hour totals.
    */
   timeEntries?: Record<string, TimeEntry[]>;
+  /** Missing in older files, which were always paid by the hour. */
+  salary?: SalarySettings;
 }
 
 /**
@@ -98,10 +116,28 @@ export interface WorkRules {
   overtimeMultiplier: number;
   /** Also count hours beyond the schedule on workdays as overtime. */
   overtimeIncludesLongDays: boolean;
+  /**
+   * Today's target is what's left of the week's hours, shared over the
+   * workdays still to come, rather than the fixed hours per day.
+   */
+  balanceWeek: boolean;
+  /**
+   * With the week balanced, hours over or under in earlier weeks come off
+   * or go onto this week's hours.
+   */
+  carryBalance: boolean;
+  /** Start the carried balance from zero every 1 January. */
+  balanceResetsYearly: boolean;
+  /** Most hours carried either way (0 = no limit). */
+  balanceCapHours: number;
 }
 
 export interface TrackerSettings extends Partial<WorkRules> {
   payslipStartDay: number;
+  /** Vacation allowance per leave year (0 = not tracked). */
+  vacationDaysPerYear?: number;
+  /** Month the leave year starts in, 1–12 (1 = calendar year). */
+  leaveYearStartMonth?: number;
 }
 
 export interface DataFile {

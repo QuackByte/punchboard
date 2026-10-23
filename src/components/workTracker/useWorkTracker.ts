@@ -7,6 +7,7 @@ import {
   DataFile,
   DayKey,
   ExceptionType,
+  SalarySettings,
   SAVED_MONTHS_KEY,
   SETTINGS_KEY,
   TimeEntry,
@@ -27,7 +28,9 @@ import {
   formatMonthKey,
   getCurrentPayslipEndMonthKey,
   getDatesInPayslipRange,
+  formatLeaveYear,
   getInitialUiState,
+  getPayslipRange,
   keyToDate,
   minutesSinceMidnight,
   parseDayInput,
@@ -51,8 +54,16 @@ import {
 import {
   computePay,
   computePeriod,
+  countVacation,
+  DEFAULT_SALARY,
+  leaveYearRange,
   DEFAULT_WORK_RULES,
+  DayResult,
+  normalizeSalary,
   normalizeWorkRules,
+  carriedBalance,
+  weeklyDayTarget,
+  weeklyHoursOf,
   workedTime,
 } from "./calculations";
 import { useUndo } from "./useUndo";
@@ -77,12 +88,34 @@ function readStoredSettings() {
     const parsed = raw ? (JSON.parse(raw) as Partial<TrackerSettings>) : {};
     return {
       payslipStartDay: clampDay(parsed.payslipStartDay ?? 21),
+      vacationDaysPerYear: clampVacationDays(parsed.vacationDaysPerYear),
+      leaveYearStartMonth: clampMonth(parsed.leaveYearStartMonth),
       workRules: normalizeWorkRules(parsed),
+      // Kept so settings added by newer versions survive a save here.
+      extras: parsed as Record<string, unknown>,
     };
   } catch {
     safeStorageRemoveItem(SETTINGS_KEY);
-    return { payslipStartDay: 21, workRules: DEFAULT_WORK_RULES };
+    return {
+      payslipStartDay: 21,
+      vacationDaysPerYear: 0,
+      leaveYearStartMonth: 1,
+      workRules: DEFAULT_WORK_RULES,
+      extras: {} as Record<string, unknown>,
+    };
   }
+}
+
+function clampVacationDays(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(366, Math.max(0, value))
+    : 0;
+}
+
+function clampMonth(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value)
+    ? Math.min(12, Math.max(1, value))
+    : 1;
 }
 
 function describeDay(key: string) {
@@ -169,6 +202,7 @@ export function useWorkTracker() {
   ]);
   const [hoursPerDay, setHoursPerDay] = useState<number>(8);
   const [hourlyRate, setHourlyRate] = useState<number>(15);
+  const [salary, setSalary] = useState<SalarySettings>(DEFAULT_SALARY);
   const [currency, setCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
   const [secondaryCurrency, setSecondaryCurrency] = useState<CurrencyCode>(
     DEFAULT_SECONDARY_CURRENCY,
@@ -184,12 +218,30 @@ export function useWorkTracker() {
   const [payslipStartDay, setPayslipStartDay] = useState<number>(
     storedSettings.payslipStartDay,
   );
+  const [vacationDaysPerYear, setVacationDaysPerYear] = useState<number>(
+    storedSettings.vacationDaysPerYear,
+  );
+  const [leaveYearStartMonth, setLeaveYearStartMonth] = useState<number>(
+    storedSettings.leaveYearStartMonth,
+  );
   const [workRules, setWorkRules] = useState<WorkRules>(
     storedSettings.workRules,
   );
   const trackerSettings = useMemo<TrackerSettings>(
-    () => ({ payslipStartDay, ...workRules }),
-    [payslipStartDay, workRules],
+    () => ({
+      ...storedSettings.extras,
+      payslipStartDay,
+      vacationDaysPerYear,
+      leaveYearStartMonth,
+      ...workRules,
+    }),
+    [
+      storedSettings.extras,
+      payslipStartDay,
+      vacationDaysPerYear,
+      leaveYearStartMonth,
+      workRules,
+    ],
   );
   const [defaultHours, setDefaultHours] = useState<number>(8);
   const [exceptions, setExceptions] = useState<Record<string, ExceptionType>>(
@@ -200,6 +252,11 @@ export function useWorkTracker() {
   const [timeEntries, setTimeEntries] = useState<Record<string, TimeEntry[]>>(
     {},
   );
+  /**
+   * The loaded month as stored, so fields added by newer versions survive a
+   * save here; the known fields below always win.
+   */
+  const [monthExtras, setMonthExtras] = useState<Partial<TrackerData>>({});
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [savedMonths, setSavedMonths] = useState<string[]>([]);
   const [lastSavedAt, setLastSavedAt] = useState<string>("");
@@ -361,6 +418,7 @@ export function useWorkTracker() {
             currencyConversionEnabled:
               data.currencyConversionEnabled ??
               DEFAULT_CURRENCY_CONVERSION_ENABLED,
+            salary: normalizeSalary(data.salary),
           };
         }
       } catch {
@@ -376,6 +434,7 @@ export function useWorkTracker() {
       secondaryCurrency: DEFAULT_SECONDARY_CURRENCY,
       conversionRate: DEFAULT_CONVERSION_RATE,
       currencyConversionEnabled: DEFAULT_CURRENCY_CONVERSION_ENABLED,
+      salary: DEFAULT_SALARY,
     };
   };
 
@@ -391,7 +450,8 @@ export function useWorkTracker() {
       | "conversionRate"
       | "currency"
       | "secondaryCurrency"
-      | "currencyConversionEnabled",
+      | "currencyConversionEnabled"
+      | "salary",
   >(
     field: K,
     value: TrackerData[K],
@@ -420,6 +480,10 @@ export function useWorkTracker() {
 
       if (payload.settings) {
         setPayslipStartDay(clampDay(payload.settings.payslipStartDay ?? 21));
+        setVacationDaysPerYear(
+          clampVacationDays(payload.settings.vacationDaysPerYear),
+        );
+        setLeaveYearStartMonth(clampMonth(payload.settings.leaveYearStartMonth));
         setWorkRules(normalizeWorkRules(payload.settings));
       }
       if (payload.uiState) {
@@ -596,6 +660,22 @@ export function useWorkTracker() {
     addActivity("value-change", `Updated hourly rate to ${clamped}`);
   };
 
+  const onSalaryChange = (patch: Partial<SalarySettings>) => {
+    const next = normalizeSalary({ ...salary, ...patch });
+    // Turning a salary on for the first time starts from the schedule.
+    if (next.enabled && next.weeklyHours === 0) {
+      next.weeklyHours = selectedDays.length * hoursPerDay;
+    }
+    setSalary(next);
+    updateCurrentAndFutureMonths("salary", next);
+    addActivity(
+      "value-change",
+      patch.enabled !== undefined
+        ? `Switched to ${patch.enabled ? "a fixed salary" : "hourly pay"}`
+        : `Updated salary ${Object.keys(patch).join(", ")}`,
+    );
+  };
+
   const onCurrencyChange = (value: CurrencyCode) => {
     setCurrency(value);
     updateCurrentAndFutureMonths("currency", value);
@@ -641,6 +721,18 @@ export function useWorkTracker() {
     const clamped = clampDay(value);
     setPayslipStartDay(clamped);
     addActivity("value-change", `Updated payslip start day to ${clamped}`);
+  };
+
+  const onVacationDaysPerYearChange = (value: number) => {
+    const next = clampVacationDays(value);
+    setVacationDaysPerYear(next);
+    addActivity("value-change", `Updated vacation allowance to ${next} days`);
+  };
+
+  const onLeaveYearStartMonthChange = (value: number) => {
+    const next = clampMonth(value);
+    setLeaveYearStartMonth(next);
+    addActivity("value-change", `Updated leave year start to month ${next}`);
   };
 
   const onDefaultHoursChange = (value: number) => {
@@ -717,6 +809,7 @@ export function useWorkTracker() {
       setSecondaryCurrency(carryForward.secondaryCurrency);
       setConversionRate(carryForward.conversionRate);
       setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
+      setSalary(carryForward.salary);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
@@ -724,6 +817,7 @@ export function useWorkTracker() {
       setDailyHours({});
       setExtraHours({});
       setTimeEntries({});
+      setMonthExtras({});
       setIsMonthHydrated(true);
       return;
     }
@@ -744,6 +838,7 @@ export function useWorkTracker() {
       setCurrencyConversionEnabled(
         data.currencyConversionEnabled ?? DEFAULT_CURRENCY_CONVERSION_ENABLED,
       );
+      setSalary(normalizeSalary(data.salary));
       setTaxPercent(data.taxPercent ?? 0);
       setExtraDeduction(data.extraDeduction ?? 0);
       setDefaultHours(
@@ -755,6 +850,7 @@ export function useWorkTracker() {
       setDailyHours(data.dailyHours ?? {});
       setExtraHours(data.extraHours ?? {});
       setTimeEntries(data.timeEntries ?? {});
+      setMonthExtras(data);
     } catch {
       safeStorageRemoveItem(`tracker-${monthKey}`);
       const carryForward = getCarryForwardGlobalValues(monthKey);
@@ -765,6 +861,7 @@ export function useWorkTracker() {
       setSecondaryCurrency(carryForward.secondaryCurrency);
       setConversionRate(carryForward.conversionRate);
       setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
+      setSalary(carryForward.salary);
       setTaxPercent(carryForward.taxPercent);
       setExtraDeduction(0);
       setDefaultHours(carryForward.defaultHours);
@@ -772,6 +869,7 @@ export function useWorkTracker() {
       setDailyHours({});
       setExtraHours({});
       setTimeEntries({});
+      setMonthExtras({});
     } finally {
       setIsMonthHydrated(true);
       setHydratedMonthKey(monthKey);
@@ -780,6 +878,7 @@ export function useWorkTracker() {
 
   const currentMonthData = useMemo<TrackerData>(
     () => ({
+      ...monthExtras,
       selectedDays,
       hoursPerDay,
       hourlyRate,
@@ -794,6 +893,7 @@ export function useWorkTracker() {
       dailyHours,
       extraHours,
       timeEntries,
+      salary,
     }),
     [
       selectedDays,
@@ -810,6 +910,8 @@ export function useWorkTracker() {
       dailyHours,
       extraHours,
       timeEntries,
+      salary,
+      monthExtras,
     ],
   );
 
@@ -1206,15 +1308,9 @@ export function useWorkTracker() {
     taxPercent,
     extraDeduction,
     overtimeMultiplier: workRules.overtimeMultiplier,
+    salary,
+    weeklyHours: weeklyHoursOf(currentMonthData),
   });
-  const grossSalary = pay.gross;
-  const taxAmount = pay.tax;
-  const extraDeductionAmount = pay.deductions;
-  const netSalary = pay.net;
-  const convertedGrossSalary = grossSalary * conversionRate;
-  const convertedNetSalary = netSalary * conversionRate;
-  const convertedTaxAmount = taxAmount * conversionRate;
-  const convertedExtraDeductionAmount = extraDeductionAmount * conversionRate;
 
   const onWorkRulesChange = (patch: Partial<WorkRules>) => {
     setWorkRules((previous) => normalizeWorkRules({ ...previous, ...patch }));
@@ -1541,6 +1637,115 @@ export function useWorkTracker() {
   ]);
 
   /**
+   * A period's data: the loaded month from state, others from storage, and
+   * months never saved as the loaded schedule with nothing logged.
+   */
+  const readMonthData = (mk: string): TrackerData => {
+    if (mk === monthKey) return currentMonthData;
+    try {
+      const raw = safeStorageGetItem(`tracker-${mk}`);
+      if (raw) return JSON.parse(raw) as TrackerData;
+    } catch {
+      // fall through to an empty month on the loaded schedule
+    }
+    return {
+      ...currentMonthData,
+      exceptions: {},
+      dailyHours: {},
+      extraHours: {},
+      timeEntries: {},
+    };
+  };
+
+  /** Every saved period's days and daily share, for the carried balance. */
+  const balanceSources = useMemo(() => {
+    if (!workRules.balanceWeek || !workRules.carryBalance) return [];
+    const monthKeys = new Set(getSavedMonthKeys());
+    monthKeys.add(monthKey);
+    const sources: Array<{ days: DayResult[]; share: number }> = [];
+    for (const mk of monthKeys) {
+      const data = readMonthData(mk);
+      const workdays = (data.selectedDays ?? []).length;
+      if (workdays === 0) continue;
+      sources.push({
+        days: computePeriod(data, mk, payslipStartDay, workRules).days,
+        share: weeklyHoursOf(data) / workdays,
+      });
+    }
+    return sources;
+  }, [monthKey, currentMonthData, payslipStartDay, workRules, lastSavedAt]);
+
+  /**
+   * Today's target hours. With the week balanced, it's what's left of the
+   * weekly hours (the salary's contracted hours, else the schedule), less
+   * any balance carried in, shared over the workdays still to come; the
+   * week may span two payslip periods.
+   */
+  const todayTarget = useMemo(() => {
+    const todayData = readMonthData(currentPeriodMonthKey);
+    const days = todayData.selectedDays ?? [];
+    const isWorkday =
+      days.includes(weekdayMap[today.getDay()]) &&
+      !todayData.exceptions?.[todayKey];
+    if (!workRules.balanceWeek) {
+      return {
+        hours: isWorkday ? (todayData.hoursPerDay ?? 8) : 0,
+        carried: 0,
+        isWorkday,
+      };
+    }
+
+    const mondayOffset = (today.getDay() + 6) % 7;
+    const monday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - mondayOffset,
+    );
+    const carried = carriedBalance(balanceSources, monday, workRules);
+
+    const periods = new Map<string, Record<string, DayResult>>();
+    const week: DayResult[] = [];
+    for (let index = 0; index < 7; index += 1) {
+      const date = new Date(
+        monday.getFullYear(),
+        monday.getMonth(),
+        monday.getDate() + index,
+      );
+      const mk = getCurrentPayslipEndMonthKey(date, payslipStartDay);
+      if (!periods.has(mk)) {
+        periods.set(
+          mk,
+          computePeriod(readMonthData(mk), mk, payslipStartDay, workRules).byKey,
+        );
+      }
+      const day = periods.get(mk)![dateKey(date)];
+      if (day) week.push(day);
+    }
+
+    return {
+      hours: weeklyDayTarget(
+        week,
+        today,
+        weeklyHoursOf(todayData),
+        days.length,
+        carried,
+      ),
+      carried,
+      isWorkday,
+    };
+    // `today` changes identity every render; todayKey captures the date.
+  }, [
+    todayKey,
+    monthKey,
+    currentMonthData,
+    currentPeriodMonthKey,
+    payslipStartDay,
+    workRules,
+    balanceSources,
+    lastSavedAt,
+  ]);
+
+  /**
    * Today's punch-clock state for the tray. While another month is open in
    * the main window, it comes from the saved current-period data instead.
    */
@@ -1548,10 +1753,6 @@ export function useWorkTracker() {
     if (isViewingCurrentPeriod) {
       return {
         entries: timeEntries[todayKey] ?? [],
-        targetHours:
-          workingDateLookup.has(todayKey) && !exceptions[todayKey]
-            ? hoursPerDay
-            : 0,
         openSession: openSession
           ? { key: openSession.key, entry: openSession.entry }
           : null,
@@ -1567,7 +1768,6 @@ export function useWorkTracker() {
       // fall back to the default schedule below
     }
     const storedEntries = stored.timeEntries ?? {};
-    const days = stored.selectedDays ?? ["mon", "tue", "wed", "thu", "fri"];
     let storedOpen: { key: string; entry: TimeEntry } | null = null;
     for (const [key, entries] of Object.entries(storedEntries)) {
       const entry = entries.find((candidate) => candidate.end === null);
@@ -1579,11 +1779,6 @@ export function useWorkTracker() {
 
     return {
       entries: storedEntries[todayKey] ?? [],
-      targetHours:
-        days.includes(weekdayMap[today.getDay()]) &&
-        !stored.exceptions?.[todayKey]
-          ? (stored.hoursPerDay ?? 8)
-          : 0,
       openSession: storedOpen,
     };
     // `today` changes identity every render; todayKey captures the date.
@@ -1591,9 +1786,6 @@ export function useWorkTracker() {
     isViewingCurrentPeriod,
     timeEntries,
     todayKey,
-    workingDateLookup,
-    exceptions,
-    hoursPerDay,
     openSession,
     currentPeriodMonthKey,
     lastSavedAt,
@@ -1610,10 +1802,23 @@ export function useWorkTracker() {
       sessionStart: trayOpen?.entry.start ?? null,
       todayKey,
       todayEntries: trayToday.entries,
-      targetHours: trayToday.targetHours,
+      isWorkday: todayTarget.isWorkday,
+      targetHours: todayTarget.hours,
+      carriedHours: todayTarget.carried,
+      breakRules: {
+        breakMinutes: workRules.breakMinutes,
+        breakAfterHours: workRules.breakAfterHours,
+      },
       openSession: trayOpen,
     });
-  }, [fileInitialized, trayToday, todayKey]);
+  }, [
+    fileInitialized,
+    trayToday,
+    todayKey,
+    todayTarget,
+    workRules.breakMinutes,
+    workRules.breakAfterHours,
+  ]);
 
   const goToCurrentPeriod = () => {
     handleMonthChange(currentPeriodMonthKey);
@@ -1661,6 +1866,61 @@ export function useWorkTracker() {
     return monthsData;
   }, [graphYear, monthKey, actualHours, payslipStartDay, workRules]);
 
+  /**
+   * Vacation in the leave year starting in `year`. Its days fall in the
+   * periods ending in its first month through a year after.
+   */
+  const vacationIn = (year: number) => {
+    const range = leaveYearRange(year, leaveYearStartMonth);
+    const days: DayResult[] = [];
+    for (let index = 0; index < 13; index += 1) {
+      const mk = formatMonthKey(
+        new Date(range.start.getFullYear(), range.start.getMonth() + index, 1),
+      );
+      let data: TrackerData | null = mk === monthKey ? currentMonthData : null;
+      if (!data) {
+        try {
+          const raw = safeStorageGetItem(`tracker-${mk}`);
+          data = raw ? (JSON.parse(raw) as TrackerData) : null;
+        } catch {
+          data = null;
+        }
+      }
+      if (data) {
+        days.push(...computePeriod(data, mk, payslipStartDay, workRules).days);
+      }
+    }
+    return {
+      allowance: vacationDaysPerYear,
+      label: formatLeaveYear(range),
+      ...countVacation(days, range, today),
+    };
+  };
+  const vacationDeps = [
+    monthKey,
+    currentMonthData,
+    payslipStartDay,
+    workRules,
+    vacationDaysPerYear,
+    leaveYearStartMonth,
+    todayKey,
+    lastSavedAt,
+  ];
+
+  /** Vacation in the leave year starting in the chart's year. */
+  const vacationYear = useMemo(
+    () => vacationIn(graphYear),
+    [graphYear, ...vacationDeps],
+  );
+
+  /** Vacation in the leave year the loaded period ends in, for exports. */
+  const periodVacation = useMemo(() => {
+    const periodEnd = getPayslipRange(monthKey, payslipStartDay).end;
+    const startsThisYear =
+      periodEnd.getMonth() + 1 >= leaveYearStartMonth;
+    return vacationIn(periodEnd.getFullYear() - (startsThisYear ? 0 : 1));
+  }, vacationDeps);
+
   const calendarCells = useMemo(() => {
     const rangeDates = getDatesInPayslipRange(monthKey, payslipStartDay);
     const cells: Array<Date | null> = [];
@@ -1686,6 +1946,45 @@ export function useWorkTracker() {
 
     return cells;
   }, [monthKey, payslipStartDay]);
+
+  /**
+   * The carried balance at the end of each calendar row's week, by the
+   * row's Monday; only for weeks that have started, and for this week up
+   * to yesterday, since today is still being worked.
+   */
+  const weekBalances = useMemo(() => {
+    const balances: Record<string, number> = {};
+    if (!workRules.balanceWeek || !workRules.carryBalance) return balances;
+    for (let index = 0; index < calendarCells.length; index += 7) {
+      const first = calendarCells
+        .slice(index, index + 7)
+        .find((cell): cell is Date => cell !== null);
+      if (!first) continue;
+      const monday = new Date(
+        first.getFullYear(),
+        first.getMonth(),
+        first.getDate() - ((first.getDay() + 6) % 7),
+      );
+      if (monday > today) continue;
+      const nextMonday = new Date(
+        monday.getFullYear(),
+        monday.getMonth(),
+        monday.getDate() + 7,
+      );
+      const startOfToday = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      balances[dateKey(monday)] = carriedBalance(
+        balanceSources,
+        nextMonday > startOfToday ? startOfToday : nextMonday,
+        workRules,
+      );
+    }
+    return balances;
+    // `today` changes identity every render; todayKey captures the date.
+  }, [calendarCells, balanceSources, workRules, todayKey]);
 
   const selectedMonthInfo = useMemo(() => {
     const { year, monthIndex } = parseMonthKey(monthKey);
@@ -1762,6 +2061,7 @@ export function useWorkTracker() {
     selectedDays,
     hoursPerDay,
     hourlyRate,
+    salary,
     currency,
     secondaryCurrency,
     conversionRate,
@@ -1784,6 +2084,7 @@ export function useWorkTracker() {
     toggleDay,
     onHoursPerDayChange,
     onHourlyRateChange,
+    onSalaryChange,
     onCurrencyChange,
     onSecondaryCurrencyChange,
     onConversionRateChange,
@@ -1791,19 +2092,18 @@ export function useWorkTracker() {
     onTaxPercentChange,
     onExtraDeductionChange,
     onPayslipStartDayChange,
+    vacationDaysPerYear,
+    onVacationDaysPerYearChange,
+    leaveYearStartMonth,
+    onLeaveYearStartMonthChange,
+    vacationYear,
+    periodVacation,
+    weekBalances,
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,
     dailyActualHours,
     estimatedHours,
-    grossSalary,
-    taxAmount,
-    extraDeductionAmount,
-    netSalary,
-    convertedGrossSalary,
-    convertedNetSalary,
-    convertedTaxAmount,
-    convertedExtraDeductionAmount,
     payslipDateLookup,
     workingDateLookup,
     setDayException,
@@ -1814,6 +2114,7 @@ export function useWorkTracker() {
     resetDay,
     applyDayInput,
     todayKey,
+    todayTarget,
     isViewingCurrentPeriod,
     goToCurrentPeriod,
     openSession,

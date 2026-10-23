@@ -144,11 +144,6 @@ export default function WorkTracker() {
     actualHours,
     dailyActualHours,
     estimatedHours,
-    grossSalary,
-    taxAmount,
-    extraDeductionAmount,
-    netSalary,
-    convertedNetSalary,
     payslipDateLookup,
     workingDateLookup,
     setDayException,
@@ -209,9 +204,20 @@ export default function WorkTracker() {
     title: selectedMonthInfo.label,
     periodLabel: formatPeriodLabel(monthKey, payslipStartDay, true),
     currency,
-    hourlyRate,
     taxPercent,
     overtimeMultiplier: tracker.workRules.overtimeMultiplier,
+    conversion:
+      currencyConversionEnabled && currency !== secondaryCurrency
+        ? { currency: secondaryCurrency, rate: tracker.conversionRate }
+        : undefined,
+    vacation:
+      tracker.periodVacation.allowance > 0
+        ? {
+            label: tracker.periodVacation.label,
+            used: tracker.periodVacation.taken + tracker.periodVacation.booked,
+            allowance: tracker.periodVacation.allowance,
+          }
+        : undefined,
   };
   const timesheetRows = () => buildTimesheetRows(tracker.period, timeEntries);
 
@@ -234,11 +240,6 @@ export default function WorkTracker() {
     document.title = previousTitle;
     setIsPrinting(false);
   };
-
-  const isTodayWorkday =
-    selectedDays.length > 0 &&
-    workingDateLookup.has(todayKey) &&
-    !exceptions[todayKey];
 
   return (
     <>
@@ -336,6 +337,8 @@ export default function WorkTracker() {
             onHoursPerDayChange={tracker.onHoursPerDayChange}
             hourlyRate={hourlyRate}
             onHourlyRateChange={tracker.onHourlyRateChange}
+            salary={tracker.salary}
+            onSalaryChange={tracker.onSalaryChange}
             currency={currency}
             onCurrencyChange={tracker.onCurrencyChange}
             secondaryCurrency={secondaryCurrency}
@@ -352,6 +355,10 @@ export default function WorkTracker() {
             onExtraDeductionChange={tracker.onExtraDeductionChange}
             payslipStartDay={payslipStartDay}
             onPayslipStartDayChange={tracker.onPayslipStartDayChange}
+            vacationDaysPerYear={tracker.vacationDaysPerYear}
+            onVacationDaysPerYearChange={tracker.onVacationDaysPerYearChange}
+            leaveYearStartMonth={tracker.leaveYearStartMonth}
+            onLeaveYearStartMonthChange={tracker.onLeaveYearStartMonthChange}
             defaultHours={tracker.defaultHours}
             onDefaultHoursChange={tracker.onDefaultHoursChange}
             recentActivity={tracker.recentActivity}
@@ -388,7 +395,9 @@ export default function WorkTracker() {
                 <PunchClock
                   todayKey={todayKey}
                   todayEntries={timeEntries[todayKey] ?? []}
-                  targetHours={isTodayWorkday ? hoursPerDay : 0}
+                  targetHours={tracker.todayTarget.hours}
+                  carriedHours={tracker.todayTarget.carried}
+                  breakRules={tracker.workRules}
                   openSession={openSession}
                   isViewingCurrentPeriod={isViewingCurrentPeriod}
                   onPunchIn={punchIn}
@@ -416,15 +425,10 @@ export default function WorkTracker() {
                   showConversion={
                     currencyConversionEnabled && currency !== secondaryCurrency
                   }
-                  hourlyRate={hourlyRate}
                   taxPercent={taxPercent}
                   overtimeMultiplier={tracker.workRules.overtimeMultiplier}
+                  conversionRate={tracker.conversionRate}
                   pay={tracker.pay}
-                  grossSalary={grossSalary}
-                  taxAmount={taxAmount}
-                  extraDeductionAmount={extraDeductionAmount}
-                  netSalary={netSalary}
-                  convertedNetSalary={convertedNetSalary}
                 />
               </div>
             </div>
@@ -443,6 +447,7 @@ export default function WorkTracker() {
                 timeEntries={timeEntries}
                 hoursPerDay={hoursPerDay}
                 workRules={tracker.workRules}
+                weekBalances={tracker.weekBalances}
                 today={today}
                 focusTodayRequest={focusTodayRequest}
                 editingKey={editingKey}
@@ -463,6 +468,7 @@ export default function WorkTracker() {
                 onNextYear={() => setGraphYear(graphYear + 1)}
                 onSelectMonth={handleMonthChange}
                 yearlyData={yearlyData}
+                vacation={tracker.vacationYear}
               />
             </div>
           </main>

@@ -1,6 +1,7 @@
 import {
   DayKey,
   ExceptionType,
+  SalarySettings,
   TimeEntry,
   TrackerData,
   WorkRules,
@@ -10,6 +11,7 @@ import {
   clampHours,
   clampPercent,
   dateKey,
+  formatClock,
   getDatesInPayslipRange,
   parseClock,
 } from "./utils";
@@ -26,6 +28,10 @@ export const DEFAULT_WORK_RULES: WorkRules = {
   roundingMinutes: 0,
   overtimeMultiplier: 1,
   overtimeIncludesLongDays: false,
+  balanceWeek: true,
+  carryBalance: true,
+  balanceResetsYearly: false,
+  balanceCapHours: 0,
 };
 
 export function normalizeWorkRules(raw: Partial<WorkRules> | undefined): WorkRules {
@@ -42,7 +48,51 @@ export function normalizeWorkRules(raw: Partial<WorkRules> | undefined): WorkRul
       : 0,
     overtimeMultiplier: number(raw?.overtimeMultiplier, 1, 1, 5),
     overtimeIncludesLongDays: raw?.overtimeIncludesLongDays === true,
+    balanceWeek: raw?.balanceWeek !== false,
+    carryBalance: raw?.carryBalance !== false,
+    balanceResetsYearly: raw?.balanceResetsYearly === true,
+    balanceCapHours: number(raw?.balanceCapHours, 0, 0, 1000),
   };
+}
+
+export const DEFAULT_SALARY: SalarySettings = {
+  enabled: false,
+  basis: "weekly",
+  weeklyHours: 0,
+  yearlyAmount: 0,
+  overtimePaid: false,
+};
+
+export function normalizeSalary(raw: Partial<SalarySettings> | undefined): SalarySettings {
+  const amount = (value: unknown, max: number) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.min(max, Math.max(0, value))
+      : 0;
+
+  return {
+    enabled: raw?.enabled === true,
+    basis: raw?.basis === "yearly" ? "yearly" : "weekly",
+    weeklyHours: amount(raw?.weeklyHours, 168),
+    yearlyAmount: amount(raw?.yearlyAmount, Number.MAX_SAFE_INTEGER),
+    overtimePaid: raw?.overtimePaid === true,
+  };
+}
+
+/**
+ * What a salary works out to: the gross paid each payslip period (a twelfth
+ * of the year) and the hourly rate it implies for the contracted hours.
+ */
+export function salaryBreakdown(salary: SalarySettings, hourlyRate: number) {
+  const yearlyHours = salary.weeklyHours * 52;
+  const yearly =
+    salary.basis === "yearly" ? salary.yearlyAmount : hourlyRate * yearlyHours;
+  const rate =
+    salary.basis === "yearly"
+      ? yearlyHours > 0
+        ? yearly / yearlyHours
+        : 0
+      : hourlyRate;
+  return { yearly, perPeriod: yearly / 12, rate };
 }
 
 /** Rounds minutes-since-midnight to the nearest step (no-op for step 0). */
@@ -125,6 +175,183 @@ export function workedTime(
     breakMinutes,
     workedMinutes: clockedMinutes - breakMinutes,
   };
+}
+
+export interface FinishEstimate {
+  /** Minutes since midnight; past 1440 when it runs into tomorrow. */
+  finishMinutes: number;
+  /** Clock time still to go, automatic break included. */
+  remainingMinutes: number;
+}
+
+/**
+ * When today's target is reached if the clock runs from `nowMinutes` on: a
+ * running session keeps going, otherwise one is assumed to start now. The
+ * automatic break is included when the day will reach its threshold, and
+ * time off the clock already counts towards it. Null once the target is met.
+ */
+export function estimateFinish(
+  entries: TimeEntry[],
+  targetHours: number,
+  rules: Pick<WorkRules, "breakMinutes" | "breakAfterHours">,
+  nowMinutes: number,
+): FinishEstimate | null {
+  const target = Math.round(targetHours * 60);
+  if (target <= 0) return null;
+
+  const running = entries.some((entry) => entry.end === null);
+  const pending = running
+    ? entries
+    : [...entries, { start: formatClock(nowMinutes), end: null }];
+  // Estimates use exact minutes; rounding would only make them jump.
+  const exact = { ...rules, roundingMinutes: 0 };
+  const workedAt = (minutes: number) =>
+    workedTime(pending, exact, minutes).workedMinutes;
+
+  if (workedAt(nowMinutes) >= target) return null;
+
+  // Reaching the break threshold on the way adds the break; one more pass
+  // covers it, since the break only applies once.
+  let finish = nowMinutes;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const missing = target - workedAt(finish);
+    if (missing <= 0) break;
+    finish += missing;
+  }
+
+  return { finishMinutes: finish, remainingMinutes: finish - nowMinutes };
+}
+
+/**
+ * Today's target when the week is balanced: the weekly hours minus what the
+ * days before today already count for, shared evenly over today and the
+ * workdays still to come. Vacation counts its holiday hours and a sick day
+ * its share of the week, whether it's past or still ahead. 0 when today
+ * isn't a plain workday.
+ *
+ * `carriedHours` (see `hourBalance`) comes off the week: banked hours make
+ * it shorter, a shortfall longer.
+ *
+ * `week` holds the week's days (any order, any that are known); `today` is
+ * matched by date.
+ */
+export function weeklyDayTarget(
+  week: DayResult[],
+  today: Date,
+  weeklyHours: number,
+  workdaysPerWeek: number,
+  carriedHours = 0,
+): number {
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const todayResult = week.find((day) => day.date.getTime() === todayStart);
+  if (!todayResult?.isWorkingDay || todayResult.exception) return 0;
+
+  const share = workdaysPerWeek > 0 ? weeklyHours / workdaysPerWeek : 0;
+  const credit = (day: DayResult) => (day.exception === "sick" ? share : day.hours);
+
+  let counted = 0;
+  let daysLeft = 0;
+  for (const day of week) {
+    const time = day.date.getTime();
+    if (time < todayStart) {
+      counted += credit(day);
+    } else if (day.isWorkingDay && !day.exception) {
+      daysLeft += 1;
+    } else if (time > todayStart && day.exception) {
+      counted += credit(day);
+    }
+  }
+
+  return Math.max(0, weeklyHours - carriedHours - counted) / Math.max(1, daysLeft);
+}
+
+/** Weekly hours: a salary's contracted hours, else the schedule's. */
+export function weeklyHoursOf(
+  data: Pick<TrackerData, "selectedDays" | "hoursPerDay" | "salary">,
+) {
+  const salary = normalizeSalary(data.salary);
+  return salary.enabled && salary.weeklyHours > 0
+    ? salary.weeklyHours
+    : (data.selectedDays ?? []).length * (data.hoursPerDay ?? 8);
+}
+
+/**
+ * Hours banked (or owed, when negative) on days before `before` (and from
+ * `from`, when given): each workday counts what it's worth minus its share
+ * of the weekly hours, a sick day nothing, and days off whatever was worked
+ * on them.
+ */
+export function hourBalance(
+  days: DayResult[],
+  before: Date,
+  share: number,
+  from?: Date,
+): number {
+  let balance = 0;
+  for (const day of days) {
+    if (day.date >= before || (from && day.date < from)) continue;
+    if (!day.isWorkingDay) balance += day.hours;
+    else if (day.exception !== "sick") balance += day.hours - share;
+  }
+  return balance;
+}
+
+/**
+ * The balance carried into the week starting `monday`, under the rules:
+ * counted from 1 January when it resets yearly, and kept within the cap.
+ * `sources` are payslip periods' days with each period's daily share.
+ */
+export function carriedBalance(
+  sources: Array<{ days: DayResult[]; share: number }>,
+  monday: Date,
+  rules: Pick<WorkRules, "balanceResetsYearly" | "balanceCapHours">,
+): number {
+  const from = rules.balanceResetsYearly
+    ? new Date(monday.getFullYear(), 0, 1)
+    : undefined;
+  const balance = sources.reduce(
+    (total, source) => total + hourBalance(source.days, monday, source.share, from),
+    0,
+  );
+  const cap = rules.balanceCapHours;
+  return cap > 0 ? Math.min(cap, Math.max(-cap, balance)) : balance;
+}
+
+export interface VacationYear {
+  /** Vacation days up to and including today. */
+  taken: number;
+  /** Vacation days marked after today. */
+  booked: number;
+}
+
+/** The leave year starting in `year`: from its start month to a year on. */
+export function leaveYearRange(year: number, startMonth: number) {
+  const month = Math.min(12, Math.max(1, Math.round(startMonth) || 1)) - 1;
+  return { start: new Date(year, month, 1), end: new Date(year + 1, month, 1) };
+}
+
+/**
+ * Vacation days from `start` up to (not including) `end`. `days` may come
+ * from several payslip periods (they straddle the year's ends); only
+ * workdays marked vacation count, the same days the period totals count.
+ */
+export function countVacation(
+  days: DayResult[],
+  range: { start: Date; end: Date },
+  today: Date,
+): VacationYear {
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const seen = new Set<string>();
+  const result: VacationYear = { taken: 0, booked: 0 };
+  for (const day of days) {
+    if (day.exception !== "vacation") continue;
+    if (day.date < range.start || day.date >= range.end) continue;
+    if (seen.has(day.key)) continue;
+    seen.add(day.key);
+    if (day.date < endOfToday) result.taken += 1;
+    else result.booked += 1;
+  }
+  return result;
 }
 
 export type DaySource = "sessions" | "manual" | "scheduled" | "none";
@@ -282,8 +509,21 @@ export function computePeriod(
 }
 
 export interface PayResult {
+  salaried: boolean;
+  /**
+   * The year's gross: the salary, or by the hour an estimate from the
+   * weekly hours (0 when they aren't known).
+   */
+  yearly: number;
+  /** Hourly rate: the one set, or the one a salary implies. */
+  rate: number;
+  /** Gross over hours actually worked (0 without hours). */
+  effectiveRate: number;
   regularHours: number;
   overtimeHours: number;
+  /** Overtime a salary doesn't pay for, tracked only. */
+  unpaidOvertimeHours: number;
+  /** Hours × rate, or the period's salary. */
   regularPay: number;
   overtimePay: number;
   gross: number;
@@ -293,8 +533,12 @@ export interface PayResult {
 }
 
 /**
- * Turns hours into an estimated payslip. Overtime is only paid differently
- * when the multiplier is above 1; otherwise every hour is paid at the rate.
+ * Turns hours into an estimated payslip.
+ *
+ * By the hour, overtime is only paid differently when the multiplier is
+ * above 1; otherwise every hour is paid at the rate. On a salary the gross
+ * is fixed, and overtime is either paid on top at the implied rate × the
+ * multiplier or tracked as unpaid.
  */
 export function computePay(
   period: Pick<PeriodResult, "actualHours" | "overtimeHours">,
@@ -303,20 +547,50 @@ export function computePay(
     taxPercent: number;
     extraDeduction: number;
     overtimeMultiplier: number;
+    salary?: SalarySettings;
+    /** For the yearly estimate by the hour. */
+    weeklyHours?: number;
   },
 ): PayResult {
   const multiplier = Math.max(1, pay.overtimeMultiplier || 1);
-  const overtimeHours = multiplier > 1 ? period.overtimeHours : 0;
+  const salaried = pay.salary?.enabled === true;
+
+  let rate = pay.hourlyRate;
+  let yearly = pay.hourlyRate * (pay.weeklyHours ?? 0) * 52;
+  let overtimeHours: number;
+  let unpaidOvertimeHours = 0;
+  let regularPay: number;
+
+  if (salaried) {
+    const salary = salaryBreakdown(pay.salary!, pay.hourlyRate);
+    rate = salary.rate;
+    yearly = salary.yearly;
+    if (pay.salary!.overtimePaid) {
+      overtimeHours = period.overtimeHours;
+    } else {
+      overtimeHours = 0;
+      unpaidOvertimeHours = period.overtimeHours;
+    }
+    regularPay = salary.perPeriod;
+  } else {
+    overtimeHours = multiplier > 1 ? period.overtimeHours : 0;
+    regularPay = Math.max(0, period.actualHours - overtimeHours) * rate;
+  }
+
   const regularHours = Math.max(0, period.actualHours - overtimeHours);
-  const regularPay = regularHours * pay.hourlyRate;
-  const overtimePay = overtimeHours * pay.hourlyRate * multiplier;
+  const overtimePay = overtimeHours * rate * multiplier;
   const gross = regularPay + overtimePay;
   const tax = gross * (clampPercent(pay.taxPercent) / 100);
   const deductions = Math.max(0, pay.extraDeduction);
 
   return {
+    salaried,
+    yearly,
+    rate,
+    effectiveRate: period.actualHours > 0 ? gross / period.actualHours : 0,
     regularHours,
     overtimeHours,
+    unpaidOvertimeHours,
     regularPay,
     overtimePay,
     gross,

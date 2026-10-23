@@ -24,10 +24,13 @@ import {
   ActivityLogEntry,
   CurrencyCode,
   DayKey,
+  SalarySettings,
   WorkRules,
   currencyOptions,
   daysOfWeek,
 } from "./types";
+import { salaryBreakdown } from "./calculations";
+import { formatMoney } from "./PeriodSummary";
 import { clampDay, clampPercent } from "./utils";
 
 interface ConfigPanelProps {
@@ -41,6 +44,8 @@ interface ConfigPanelProps {
   onHoursPerDayChange: (value: number) => void;
   hourlyRate: number;
   onHourlyRateChange: (value: number) => void;
+  salary: SalarySettings;
+  onSalaryChange: (patch: Partial<SalarySettings>) => void;
   currency: CurrencyCode;
   onCurrencyChange: (value: CurrencyCode) => void;
   secondaryCurrency: CurrencyCode;
@@ -55,6 +60,10 @@ interface ConfigPanelProps {
   onExtraDeductionChange: (value: number) => void;
   payslipStartDay: number;
   onPayslipStartDayChange: (value: number) => void;
+  vacationDaysPerYear: number;
+  onVacationDaysPerYearChange: (value: number) => void;
+  leaveYearStartMonth: number;
+  onLeaveYearStartMonthChange: (value: number) => void;
   defaultHours: number;
   onDefaultHoursChange: (value: number) => void;
   recentActivity: ActivityLogEntry[];
@@ -89,6 +98,10 @@ interface ConfigPanelProps {
 }
 
 const roundingOptions = [0, 5, 6, 10, 15, 30];
+
+const monthNames = Array.from({ length: 12 }, (_, index) =>
+  new Date(2026, index, 1).toLocaleDateString("en-GB", { month: "long" }),
+);
 
 function Section({
   title,
@@ -186,6 +199,8 @@ export default function ConfigPanel({
   onHoursPerDayChange,
   hourlyRate,
   onHourlyRateChange,
+  salary,
+  onSalaryChange,
   currency,
   onCurrencyChange,
   secondaryCurrency,
@@ -200,6 +215,10 @@ export default function ConfigPanel({
   onExtraDeductionChange,
   payslipStartDay,
   onPayslipStartDayChange,
+  vacationDaysPerYear,
+  onVacationDaysPerYearChange,
+  leaveYearStartMonth,
+  onLeaveYearStartMonthChange,
   defaultHours,
   onDefaultHoursChange,
   recentActivity,
@@ -230,6 +249,15 @@ export default function ConfigPanel({
   onDesktopPreferencesChange,
 }: ConfigPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const salaryAmounts = salaryBreakdown(salary, hourlyRate);
+  const weeklyHours =
+    salary.enabled && salary.weeklyHours > 0
+      ? salary.weeklyHours
+      : selectedDays.length * hoursPerDay;
+  // A salary can pay overtime at 1×; by the hour that's just regular pay.
+  const overtimeSeparate = salary.enabled
+    ? salary.overtimePaid
+    : workRules.overtimeMultiplier > 1;
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [checkingForUpdates, setCheckingForUpdates] = useState(false);
 
@@ -616,19 +644,58 @@ export default function ConfigPanel({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="payslip-start-day">Payslip start day</Label>
-            <Input
-              id="payslip-start-day"
-              type="number"
-              min={1}
-              max={31}
-              value={payslipStartDay}
-              onChange={(event) =>
-                onPayslipStartDayChange(clampDay(Number(event.target.value)))
-              }
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="payslip-start-day">Payslip start day</Label>
+              <Input
+                id="payslip-start-day"
+                type="number"
+                min={1}
+                max={31}
+                value={payslipStartDay}
+                onChange={(event) =>
+                  onPayslipStartDayChange(clampDay(Number(event.target.value)))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vacation-days">Vacation days/year</Label>
+              <Input
+                id="vacation-days"
+                type="number"
+                min={0}
+                max={366}
+                step={0.5}
+                value={vacationDaysPerYear}
+                onChange={(event) =>
+                  onVacationDaysPerYearChange(Number(event.target.value))
+                }
+              />
+            </div>
           </div>
+          <div className="space-y-2">
+            <Label>Leave year starts</Label>
+            <Select
+              value={String(leaveYearStartMonth)}
+              onValueChange={(next) => onLeaveYearStartMonthChange(Number(next))}
+            >
+              <SelectTrigger aria-label="Leave year starts">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthNames.map((name, index) => (
+                  <SelectItem key={name} value={String(index + 1)}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The year view counts days marked vacation against the allowance
+            for the leave year starting in that year. Leave the allowance at 0
+            to not track one.
+          </p>
         </Section>
 
         <Section title="Time rules">
@@ -711,23 +778,116 @@ export default function ConfigPanel({
             {workRules.breakMinutes > 0
               ? `Days with ${workRules.breakAfterHours}h or more on the clock lose ${workRules.breakMinutes} min, minus any gaps between sessions. `
               : ""}
-            {workRules.overtimeMultiplier > 1
-              ? `Hours on days off are paid at ${workRules.overtimeMultiplier}×.`
-              : "Set an overtime rate above 1× to pay days off at a premium."}
+            {salary.enabled
+              ? salary.overtimePaid
+                ? `Hours on days off are paid on top of the salary at ${workRules.overtimeMultiplier}×.`
+                : "Hours on days off are tracked as unpaid overtime."
+              : workRules.overtimeMultiplier > 1
+                ? `Hours on days off are paid at ${workRules.overtimeMultiplier}×.`
+                : "Set an overtime rate above 1× to pay days off at a premium."}
           </p>
           <PreferenceRow
             id="overtime-long-days"
             label="Long workdays count as overtime"
-            description={`Hours beyond the scheduled ${hoursPerDay}h on a workday are paid at the overtime rate too.`}
+            description={
+              salary.enabled && !salary.overtimePaid
+                ? `Hours beyond the scheduled ${hoursPerDay}h on a workday are tracked as unpaid overtime too.`
+                : `Hours beyond the scheduled ${hoursPerDay}h on a workday are paid at the overtime rate too.`
+            }
             checked={workRules.overtimeIncludesLongDays}
-            disabled={workRules.overtimeMultiplier <= 1}
+            disabled={!salary.enabled && !overtimeSeparate}
             onCheckedChange={(checked) =>
               onWorkRulesChange({ overtimeIncludesLongDays: checked })
             }
           />
+          <PreferenceRow
+            id="balance-week"
+            label="Balance the week"
+            description={`Today's target is what's left of the week's ${weeklyHours}h, shared over the workdays still to come, so long days early on mean a shorter one later.`}
+            checked={workRules.balanceWeek}
+            onCheckedChange={(checked) =>
+              onWorkRulesChange({ balanceWeek: checked })
+            }
+          />
+          <PreferenceRow
+            id="carry-balance"
+            label="Carry hours to next week"
+            description={`Hours over or under in earlier weeks come off or go onto this week's ${weeklyHours}h: 5h over this week means 5h less the next.`}
+            checked={workRules.carryBalance}
+            disabled={!workRules.balanceWeek}
+            onCheckedChange={(checked) =>
+              onWorkRulesChange({ carryBalance: checked })
+            }
+          />
+          {workRules.balanceWeek && workRules.carryBalance ? (
+            <>
+              <PreferenceRow
+                id="balance-resets"
+                label="Reset the balance each January"
+                description="Hours carried start again from zero on 1 January."
+                checked={workRules.balanceResetsYearly}
+                onCheckedChange={(checked) =>
+                  onWorkRulesChange({ balanceResetsYearly: checked })
+                }
+              />
+              <div className="space-y-2">
+                <Label htmlFor="balance-cap">Most hours carried (0 = no limit)</Label>
+                <Input
+                  id="balance-cap"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={workRules.balanceCapHours}
+                  onChange={(event) =>
+                    onWorkRulesChange({
+                      balanceCapHours: Number(event.target.value),
+                    })
+                  }
+                />
+              </div>
+            </>
+          ) : null}
         </Section>
 
         <Section title="Pay & currency">
+          <div className="space-y-2">
+            <Label>Paid</Label>
+            <Select
+              value={salary.enabled ? "salary" : "hourly"}
+              onValueChange={(next) =>
+                onSalaryChange({ enabled: next === "salary" })
+              }
+            >
+              <SelectTrigger aria-label="Pay type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hourly">By the hour</SelectItem>
+                <SelectItem value="salary">Fixed salary</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {salary.enabled ? (
+            <div className="space-y-2">
+              <Label>Salary from</Label>
+              <Select
+                value={salary.basis}
+                onValueChange={(next) =>
+                  onSalaryChange({ basis: next as SalarySettings["basis"] })
+                }
+              >
+                <SelectTrigger aria-label="Salary from">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Hourly rate × weekly hours</SelectItem>
+                  <SelectItem value="yearly">Yearly amount</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="hours-per-day">Hours/day</Label>
@@ -742,18 +902,60 @@ export default function ConfigPanel({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hourly-rate">Rate (per hour)</Label>
-              <Input
-                id="hourly-rate"
-                type="number"
-                min={0}
-                value={hourlyRate}
-                onChange={(event) =>
-                  onHourlyRateChange(Number(event.target.value))
-                }
-              />
-            </div>
+            {salary.enabled && salary.basis === "yearly" ? (
+              <div className="space-y-2">
+                <Label htmlFor="yearly-salary">Salary (per year)</Label>
+                <Input
+                  id="yearly-salary"
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={salary.yearlyAmount}
+                  onChange={(event) =>
+                    onSalaryChange({ yearlyAmount: Number(event.target.value) })
+                  }
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="hourly-rate">Rate (per hour)</Label>
+                <Input
+                  id="hourly-rate"
+                  type="number"
+                  min={0}
+                  value={hourlyRate}
+                  onChange={(event) =>
+                    onHourlyRateChange(Number(event.target.value))
+                  }
+                />
+              </div>
+            )}
+
+            {salary.enabled ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="weekly-hours">Contracted h/week</Label>
+                  <Input
+                    id="weekly-hours"
+                    type="number"
+                    min={0}
+                    max={168}
+                    step={0.5}
+                    value={salary.weeklyHours}
+                    onChange={(event) =>
+                      onSalaryChange({ weeklyHours: Number(event.target.value) })
+                    }
+                  />
+                </div>
+                <p className="col-span-2 text-xs text-muted-foreground">
+                  {formatMoney(salaryAmounts.perPeriod, currency)} per payslip
+                  {" · "}
+                  {formatMoney(salaryAmounts.yearly, currency)} a year
+                  {" · "}
+                  {formatMoney(salaryAmounts.rate, currency)}/h
+                </p>
+              </>
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="tax-percent">Tax (%)</Label>
@@ -797,6 +999,18 @@ export default function ConfigPanel({
               />
             </div>
           </div>
+
+          {salary.enabled ? (
+            <PreferenceRow
+              id="salary-overtime-paid"
+              label="Pay overtime on top"
+              description={`Overtime is paid at the salary's hourly rate × ${workRules.overtimeMultiplier}. Off, it's tracked but unpaid.`}
+              checked={salary.overtimePaid}
+              onCheckedChange={(checked) =>
+                onSalaryChange({ overtimePaid: checked })
+              }
+            />
+          ) : null}
 
           <div className="space-y-2">
             <Label>Currency</Label>

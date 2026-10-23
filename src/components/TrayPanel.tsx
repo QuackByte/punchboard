@@ -90,6 +90,8 @@ export default function TrayPanel() {
           todayKey={status.todayKey}
           todayEntries={status.todayEntries}
           targetHours={status.targetHours}
+          breakRules={status.breakRules}
+          carriedHours={status.carriedHours}
           openSession={status.openSession}
           isViewingCurrentPeriod
           onPunchIn={() => desktop?.requestTrayPunch()}

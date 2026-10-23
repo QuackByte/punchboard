@@ -36,7 +36,11 @@ type TrayStatus = {
   /** Today's sessions and schedule, so the tray popover can mirror the punch clock. */
   todayKey: string;
   todayEntries: TimeEntry[];
+  /** Missing from older renderers, which sent 0 hours on days off. */
+  isWorkday?: boolean;
   targetHours: number;
+  breakRules?: { breakMinutes: number; breakAfterHours: number };
+  carriedHours?: number;
   openSession: { key: string; entry: TimeEntry } | null;
 };
 
@@ -574,7 +578,7 @@ function checkReminders() {
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const dayKey = trayStatus.todayKey;
-  const isWorkday = trayStatus.targetHours > 0;
+  const isWorkday = trayStatus.isWorkday ?? trayStatus.targetHours > 0;
 
   if (reminders.startTime && isWorkday) {
     const firedKey = `start:${dayKey}`;
@@ -598,8 +602,10 @@ function checkReminders() {
   if (reminders.overtime && trayStatus.canPunchOut && isWorkday) {
     const firedKey = `overtime:${dayKey}`;
     const clocked = todayClockedMinutes();
+    // A day the balanced week leaves nothing for has no overtime point.
     if (
       !firedReminders.has(firedKey) &&
+      trayStatus.targetHours > 0 &&
       clocked >= trayStatus.targetHours * 60
     ) {
       firedReminders.add(firedKey);

@@ -21,6 +21,12 @@ export default function TimesheetPrint({
 }) {
   const money = (amount: number) =>
     formatMoney(amount, meta.currency as CurrencyCode);
+  /** An amount, followed by the converted one when converting. */
+  const amounts = (amount: number, sign = "") =>
+    `${sign}${money(amount)}` +
+    (meta.conversion
+      ? ` (≈ ${sign}${formatMoney(amount * meta.conversion.rate, meta.conversion.currency as CurrencyCode)})`
+      : "");
   const hours = (value: number) => (value > 0 ? formatDuration(value) : "");
 
   return (
@@ -111,29 +117,59 @@ export default function TimesheetPrint({
           <SummaryLine label="Workdays" value={String(period.workingDaysCount)} />
           <SummaryLine label="Vacation days" value={String(period.vacationDays)} />
           <SummaryLine label="Sick days" value={String(period.sickDays)} />
+          {meta.vacation ? (
+            <SummaryLine
+              label={`Vacation ${meta.vacation.label}`}
+              value={`${meta.vacation.used} of ${meta.vacation.allowance}`}
+            />
+          ) : null}
           <SummaryLine label="Days-off hours" value={formatDuration(period.extraHoursTotal)} />
         </dl>
         <dl className="space-y-0.5 text-[9pt]">
-          <SummaryLine label="Rate" value={`${money(meta.hourlyRate)}/h`} />
-          {pay.overtimePay > 0 ? (
+          <SummaryLine label="Rate" value={`${money(pay.rate)}/h`} />
+          {pay.salaried ? (
+            <>
+              <SummaryLine label="Effective rate" value={`${money(pay.effectiveRate)}/h`} />
+              {pay.unpaidOvertimeHours > 0 ? (
+                <SummaryLine
+                  label="Unpaid overtime"
+                  value={formatDuration(pay.unpaidOvertimeHours)}
+                />
+              ) : null}
+              <SummaryLine label="Yearly salary" value={amounts(pay.yearly)} />
+              <SummaryLine label="Salary" value={amounts(pay.regularPay)} />
+              {pay.overtimePay > 0 ? (
+                <SummaryLine
+                  label={`Overtime ${formatDuration(pay.overtimeHours)} ×${meta.overtimeMultiplier}`}
+                  value={amounts(pay.overtimePay)}
+                />
+              ) : null}
+            </>
+          ) : pay.overtimePay > 0 ? (
             <>
               <SummaryLine
                 label={`Regular ${formatDuration(pay.regularHours)}`}
-                value={money(pay.regularPay)}
+                value={amounts(pay.regularPay)}
               />
               <SummaryLine
                 label={`Overtime ${formatDuration(pay.overtimeHours)} ×${meta.overtimeMultiplier}`}
-                value={money(pay.overtimePay)}
+                value={amounts(pay.overtimePay)}
               />
             </>
           ) : null}
-          <SummaryLine label="Gross" value={money(pay.gross)} />
-          <SummaryLine label={`Tax ${meta.taxPercent}%`} value={`−${money(pay.tax)}`} />
-          <SummaryLine label="Deductions" value={`−${money(pay.deductions)}`} />
+          <SummaryLine label="Gross" value={amounts(pay.gross)} />
+          <SummaryLine label={`Tax ${meta.taxPercent}%`} value={amounts(pay.tax, "−")} />
+          <SummaryLine label="Deductions" value={amounts(pay.deductions, "−")} />
           <div className="flex items-baseline justify-between border-t-2 border-neutral-900 pt-1 text-[11pt] font-bold">
             <dt>Net pay</dt>
             <dd className="font-mono">{money(pay.net)}</dd>
           </div>
+          {meta.conversion ? (
+            <p className="text-right font-mono text-[9pt] text-neutral-600">
+              ≈ {formatMoney(pay.net * meta.conversion.rate, meta.conversion.currency as CurrencyCode)}
+              {" "}at {meta.conversion.rate}
+            </p>
+          ) : null}
         </dl>
       </section>
 

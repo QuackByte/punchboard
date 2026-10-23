@@ -129,6 +129,15 @@ export function getDatesInPayslipRange(monthKey: string, startDay: number) {
   return dates;
 }
 
+/** "2026" for a calendar year, else e.g. "Apr 2026 – Mar 2027". */
+export function formatLeaveYear(range: { start: Date; end: Date }) {
+  if (range.start.getMonth() === 0) return String(range.start.getFullYear());
+  const last = new Date(range.end.getFullYear(), range.end.getMonth() - 1, 1);
+  const format = (date: Date) =>
+    date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  return `${format(range.start)} – ${format(last)}`;
+}
+
 export function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
