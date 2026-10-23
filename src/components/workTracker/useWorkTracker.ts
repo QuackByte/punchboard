@@ -61,6 +61,8 @@ import {
   DayResult,
   normalizeSalary,
   normalizeWorkRules,
+  balanceSource,
+  BalanceSource,
   carriedBalance,
   weeklyDayTarget,
   weeklyHoursOf,
@@ -1657,20 +1659,23 @@ export function useWorkTracker() {
     };
   };
 
-  /** Every saved period's days and daily share, for the carried balance. */
+  /**
+   * Saved salaried periods, for the carried balance. Periods paid by the
+   * hour are left out: every hour in them was paid.
+   */
   const balanceSources = useMemo(() => {
     if (!workRules.balanceWeek || !workRules.carryBalance) return [];
     const monthKeys = new Set(getSavedMonthKeys());
     monthKeys.add(monthKey);
-    const sources: Array<{ days: DayResult[]; share: number }> = [];
+    const sources: BalanceSource[] = [];
     for (const mk of monthKeys) {
       const data = readMonthData(mk);
-      const workdays = (data.selectedDays ?? []).length;
-      if (workdays === 0) continue;
-      sources.push({
-        days: computePeriod(data, mk, payslipStartDay, workRules).days,
-        share: weeklyHoursOf(data) / workdays,
-      });
+      if (!normalizeSalary(data.salary).enabled) continue;
+      const source = balanceSource(
+        data,
+        computePeriod(data, mk, payslipStartDay, workRules).days,
+      );
+      if (source) sources.push(source);
     }
     return sources;
   }, [monthKey, currentMonthData, payslipStartDay, workRules, lastSavedAt]);

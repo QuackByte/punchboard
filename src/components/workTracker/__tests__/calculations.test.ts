@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computePay,
+  balanceSource,
   carriedBalance,
   computePeriod,
   countVacation,
@@ -66,6 +67,7 @@ describe("normalizeWorkRules", () => {
         carryBalance: false,
         balanceResetsYearly: true,
         balanceCapHours: -3,
+        balanceStartDate: "21/10/2026",
       }),
     ).toEqual({
       breakMinutes: 0,
@@ -77,6 +79,7 @@ describe("normalizeWorkRules", () => {
       carryBalance: false,
       balanceResetsYearly: true,
       balanceCapHours: 0,
+      balanceStartDate: "",
     });
   });
 });
@@ -585,11 +588,12 @@ describe("carriedBalance", () => {
   const period = (mk: string, dailyHours: Record<string, number>) => ({
     days: computePeriod(data({ hoursPerDay: 9, dailyHours }), mk, START_DAY, rules()).days,
     share: 9,
+    overtimePaid: false,
   });
   // 10h on Mon 1 Dec 2025 and on Mon 5 Jan 2026.
   const sources = [period("2026-01", { "2025-11-1": 10 }), period("2026-02", { "2026-0-5": 10 })];
   const MONDAY = new Date(2026, 0, 12);
-  const noLimits = { balanceResetsYearly: false, balanceCapHours: 0 };
+  const noLimits = { balanceResetsYearly: false, balanceCapHours: 0, balanceStartDate: "" };
 
   it("adds up every period before the week", () => {
     expect(carriedBalance(sources, MONDAY, noLimits)).toBe(2);
@@ -603,6 +607,71 @@ describe("carriedBalance", () => {
     expect(carriedBalance(sources, MONDAY, { ...noLimits, balanceCapHours: 1.5 })).toBe(1.5);
     const short = [period("2026-02", { "2026-0-5": 0 })];
     expect(carriedBalance(short, MONDAY, { ...noLimits, balanceCapHours: 4 })).toBe(-4);
+  });
+
+  it("skips days before the start date", () => {
+    expect(carriedBalance(sources, MONDAY, { ...noLimits, balanceStartDate: "2026-01-05" })).toBe(1);
+    expect(carriedBalance(sources, MONDAY, { ...noLimits, balanceStartDate: "2026-01-06" })).toBe(0);
+  });
+
+  it("starts from the later of the start date and 1 January", () => {
+    const rulesBoth = { ...noLimits, balanceResetsYearly: true, balanceStartDate: "2025-06-01" };
+    expect(carriedBalance(sources, MONDAY, rulesBoth)).toBe(1);
+  });
+});
+
+describe("balanceSource", () => {
+  const salary = (patch: Partial<SalarySettings> = {}): SalarySettings => ({
+    ...DEFAULT_SALARY,
+    enabled: true,
+    weeklyHours: 45,
+    ...patch,
+  });
+
+  it("leaves out periods paid by the hour, whose hours were all paid", () => {
+    expect(balanceSource(data({ hoursPerDay: 9 }), [])).toBeNull();
+    expect(balanceSource(data({ salary: salary({ enabled: false }) }), [])).toBeNull();
+  });
+
+  it("shares a salary's weekly hours over the scheduled days", () => {
+    expect(balanceSource(data({ salary: salary({ overtimePaid: true }) }), [])).toEqual({
+      days: [],
+      share: 9,
+      overtimePaid: true,
+    });
+  });
+
+  it("switching to a salary mid-history only banks from the salaried periods", () => {
+    // February (hourly): a 50h week. March (salaried): a 46h week.
+    const hourly = data({ hoursPerDay: 9, dailyHours: { "2026-1-2": 14 } });
+    const salaried = data({ hoursPerDay: 9, salary: salary(), dailyHours: { "2026-2-2": 10 } });
+    const sources = [
+      balanceSource(hourly, computePeriod(hourly, "2026-03", START_DAY, rules()).days),
+      balanceSource(salaried, computePeriod(salaried, MONTH, START_DAY, rules()).days),
+    ].filter((source): source is NonNullable<typeof source> => source !== null);
+    const limits = { balanceResetsYearly: false, balanceCapHours: 0, balanceStartDate: "" };
+    expect(carriedBalance(sources, new Date(2026, 3, 1), limits)).toBe(1);
+  });
+});
+
+describe("hourBalance with overtime paid on top", () => {
+  // Monday 2 March 11h (2h over), Saturday 7 March 4h, on 9h days.
+  const days = (overtimeIncludesLongDays: boolean) =>
+    computePeriod(
+      data({ hoursPerDay: 9, dailyHours: { "2026-2-2": 11 }, extraHours: { "2026-2-7": 4 } }),
+      MONTH,
+      START_DAY,
+      rules({ overtimeIncludesLongDays }),
+    ).days;
+  const NEXT_MONDAY = new Date(2026, 2, 9);
+
+  it("doesn't bank days-off hours, which were paid", () => {
+    expect(hourBalance(days(false), NEXT_MONDAY, 9, { overtimePaid: true })).toBe(2);
+    expect(hourBalance(days(false), NEXT_MONDAY, 9)).toBe(6);
+  });
+
+  it("doesn't bank long days either when they count as overtime", () => {
+    expect(hourBalance(days(true), NEXT_MONDAY, 9, { overtimePaid: true })).toBe(0);
   });
 });
 

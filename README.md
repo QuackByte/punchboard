@@ -45,8 +45,10 @@ marketing page, or jump straight into the
   primary one on every payslip line, using a manual conversion rate.
 - **Balanced weeks** — today's target is what's left of your weekly hours,
   shared over the workdays still to come: 40h by Thursday on a 45h week
-  leaves 5h for Friday. Hours over or under carry into the next weeks,
-  optionally resetting each January or capped at a limit.
+  leaves 5h for Friday. On a salary, hours over or under carry into the
+  next weeks (only unpaid ones: hourly periods and overtime paid on top
+  don't bank), optionally from a start date, resetting each January or
+  capped at a limit.
 - **Finish estimate** — the punch clock shows when you'll be done for the
   day, automatic break included.
 - **Yearly overview** — a chart of hours worked per month across the year.

@@ -32,6 +32,7 @@ export const DEFAULT_WORK_RULES: WorkRules = {
   carryBalance: true,
   balanceResetsYearly: false,
   balanceCapHours: 0,
+  balanceStartDate: "",
 };
 
 export function normalizeWorkRules(raw: Partial<WorkRules> | undefined): WorkRules {
@@ -52,6 +53,11 @@ export function normalizeWorkRules(raw: Partial<WorkRules> | undefined): WorkRul
     carryBalance: raw?.carryBalance !== false,
     balanceResetsYearly: raw?.balanceResetsYearly === true,
     balanceCapHours: number(raw?.balanceCapHours, 0, 0, 1000),
+    balanceStartDate:
+      typeof raw?.balanceStartDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(raw.balanceStartDate)
+        ? raw.balanceStartDate
+        : "",
   };
 }
 
@@ -279,42 +285,88 @@ export function weeklyHoursOf(
  * Hours banked (or owed, when negative) on days before `before` (and from
  * `from`, when given): each workday counts what it's worth minus its share
  * of the weekly hours, a sick day nothing, and days off whatever was worked
- * on them.
+ * on them. With `overtimePaid`, overtime hours were paid on the payslip, so
+ * they don't bank.
  */
 export function hourBalance(
   days: DayResult[],
   before: Date,
   share: number,
-  from?: Date,
+  options: { from?: Date; overtimePaid?: boolean } = {},
 ): number {
   let balance = 0;
   for (const day of days) {
-    if (day.date >= before || (from && day.date < from)) continue;
-    if (!day.isWorkingDay) balance += day.hours;
-    else if (day.exception !== "sick") balance += day.hours - share;
+    if (day.date >= before || (options.from && day.date < options.from)) continue;
+    const hours = options.overtimePaid ? day.hours - day.overtimeHours : day.hours;
+    if (!day.isWorkingDay) balance += hours;
+    else if (day.exception !== "sick") balance += hours - share;
   }
   return balance;
 }
 
+/** A payslip period as the carried balance sees it. */
+export interface BalanceSource {
+  days: DayResult[];
+  /** Each workday's share of the weekly hours. */
+  share: number;
+  /** Overtime was paid on top of the salary, so it doesn't bank. */
+  overtimePaid: boolean;
+}
+
+/**
+ * A period's contribution to the carried balance, or null when nothing in
+ * it can bank: by the hour every hour was paid, so only salaried periods
+ * count.
+ */
+export function balanceSource(
+  data: Pick<TrackerData, "selectedDays" | "hoursPerDay" | "salary">,
+  days: DayResult[],
+): BalanceSource | null {
+  const salary = normalizeSalary(data.salary);
+  const workdays = (data.selectedDays ?? []).length;
+  if (!salary.enabled || workdays === 0) return null;
+  return {
+    days,
+    share: weeklyHoursOf(data) / workdays,
+    overtimePaid: salary.overtimePaid,
+  };
+}
+
 /**
  * The balance carried into the week starting `monday`, under the rules:
- * counted from 1 January when it resets yearly, and kept within the cap.
- * `sources` are payslip periods' days with each period's daily share.
+ * counted from the start date and, when it resets yearly, from 1 January,
+ * whichever is later, and kept within the cap.
  */
 export function carriedBalance(
-  sources: Array<{ days: DayResult[]; share: number }>,
+  sources: BalanceSource[],
   monday: Date,
-  rules: Pick<WorkRules, "balanceResetsYearly" | "balanceCapHours">,
+  rules: Pick<WorkRules, "balanceResetsYearly" | "balanceCapHours" | "balanceStartDate">,
 ): number {
-  const from = rules.balanceResetsYearly
-    ? new Date(monday.getFullYear(), 0, 1)
-    : undefined;
+  const starts = [
+    rules.balanceResetsYearly ? new Date(monday.getFullYear(), 0, 1) : null,
+    rules.balanceStartDate ? keyToStartDate(rules.balanceStartDate) : null,
+  ].filter((date): date is Date => date !== null);
+  const from =
+    starts.length > 0
+      ? new Date(Math.max(...starts.map((date) => date.getTime())))
+      : undefined;
   const balance = sources.reduce(
-    (total, source) => total + hourBalance(source.days, monday, source.share, from),
+    (total, source) =>
+      total +
+      hourBalance(source.days, monday, source.share, {
+        from,
+        overtimePaid: source.overtimePaid,
+      }),
     0,
   );
   const cap = rules.balanceCapHours;
   return cap > 0 ? Math.min(cap, Math.max(-cap, balance)) : balance;
+}
+
+/** A "YYYY-MM-DD" date as local midnight. */
+function keyToStartDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 export interface VacationYear {
