@@ -130,6 +130,8 @@ export interface WorkRules {
   balanceResetsYearly: boolean;
   /** Most hours carried either way (0 = no limit). */
   balanceCapHours: number;
+  /** Days before this "YYYY-MM-DD" date never count ("" = no start). */
+  balanceStartDate: string;
 }
 
 export interface TrackerSettings extends Partial<WorkRules> {

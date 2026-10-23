@@ -831,6 +831,22 @@ export default function ConfigPanel({
                 }
               />
               <div className="space-y-2">
+                <Label htmlFor="balance-start">Count balance from</Label>
+                <Input
+                  id="balance-start"
+                  type="date"
+                  value={workRules.balanceStartDate}
+                  onChange={(event) =>
+                    onWorkRulesChange({ balanceStartDate: event.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only salaried periods bank hours, and overtime paid on top
+                  never does. Set a date to skip anything earlier, such as the
+                  day a contract changed.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="balance-cap">Most hours carried (0 = no limit)</Label>
                 <Input
                   id="balance-cap"
