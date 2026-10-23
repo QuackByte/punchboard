@@ -238,6 +238,10 @@ export function estimateFinish(
  * `carriedHours` (see `hourBalance`) comes off the week: banked hours make
  * it shorter, a shortfall longer.
  *
+ * `settled` days were already paid for some other way, e.g. by the hour
+ * before a switch to a salary mid-week: a workday counts as exactly its
+ * share whatever was worked, a day off as nothing.
+ *
  * `week` holds the week's days (any order, any that are known); `today` is
  * matched by date.
  */
@@ -247,13 +251,17 @@ export function weeklyDayTarget(
   weeklyHours: number,
   workdaysPerWeek: number,
   carriedHours = 0,
+  settled: (day: DayResult) => boolean = () => false,
 ): number {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const todayResult = week.find((day) => day.date.getTime() === todayStart);
   if (!todayResult?.isWorkingDay || todayResult.exception) return 0;
 
   const share = workdaysPerWeek > 0 ? weeklyHours / workdaysPerWeek : 0;
-  const credit = (day: DayResult) => (day.exception === "sick" ? share : day.hours);
+  const credit = (day: DayResult) => {
+    if (settled(day)) return day.isWorkingDay ? share : 0;
+    return day.exception === "sick" ? share : day.hours;
+  };
 
   let counted = 0;
   let daysLeft = 0;
