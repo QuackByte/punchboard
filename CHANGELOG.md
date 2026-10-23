@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.0...punchboard-v1.14.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* only bank hours that weren't paid ([#59](https://github.com/QuackByte/punchboard/issues/59)) ([075b8f6](https://github.com/QuackByte/punchboard/commit/075b8f6d59bcbab995879153b632c91e5c5751db))
+
 ## [1.14.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.13.1...punchboard-v1.14.0) (2026-10-23)
 
 
