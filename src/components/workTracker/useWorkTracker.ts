@@ -1708,8 +1708,19 @@ export function useWorkTracker() {
     );
     const carried = carriedBalance(balanceSources, monday, workRules);
 
-    const periods = new Map<string, Record<string, DayResult>>();
+    const periods = new Map<
+      string,
+      { byKey: Record<string, DayResult>; salaried: boolean }
+    >();
     const week: DayResult[] = [];
+    // On a salary, days paid by the hour (or before the balance's start
+    // date) were settled on their own payslip, e.g. the start of the week a
+    // contract changed: they count as their share, not what was worked.
+    const settledKeys = new Set<string>();
+    const todaySalaried = normalizeSalary(todayData.salary).enabled;
+    const startDate = workRules.balanceStartDate
+      ? new Date(`${workRules.balanceStartDate}T00:00:00`)
+      : null;
     for (let index = 0; index < 7; index += 1) {
       const date = new Date(
         monday.getFullYear(),
@@ -1718,13 +1729,19 @@ export function useWorkTracker() {
       );
       const mk = getCurrentPayslipEndMonthKey(date, payslipStartDay);
       if (!periods.has(mk)) {
-        periods.set(
-          mk,
-          computePeriod(readMonthData(mk), mk, payslipStartDay, workRules).byKey,
-        );
+        const data = readMonthData(mk);
+        periods.set(mk, {
+          byKey: computePeriod(data, mk, payslipStartDay, workRules).byKey,
+          salaried: normalizeSalary(data.salary).enabled,
+        });
       }
-      const day = periods.get(mk)![dateKey(date)];
-      if (day) week.push(day);
+      const period = periods.get(mk)!;
+      const day = period.byKey[dateKey(date)];
+      if (!day) continue;
+      week.push(day);
+      if (todaySalaried && (!period.salaried || (startDate && date < startDate))) {
+        settledKeys.add(day.key);
+      }
     }
 
     return {
@@ -1734,6 +1751,7 @@ export function useWorkTracker() {
         weeklyHoursOf(todayData),
         days.length,
         carried,
+        (day) => settledKeys.has(day.key),
       ),
       carried,
       isWorkday,

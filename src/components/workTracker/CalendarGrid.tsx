@@ -166,6 +166,25 @@ export default function CalendarGrid({
   const now = useNow(30_000);
   const nowMinutes = minutesSinceMidnight(now);
   const todayKey = dateKey(today);
+
+  /**
+   * A day's hours with the time rules applied (dailyActualHours), plus,
+   * for today's running session, the time it has run so far, so cells and
+   * week totals tick along.
+   */
+  const liveDay = (key: string) => {
+    const entries = timeEntries[key] ?? [];
+    const stored = entries.length > 0 ? workedTime(entries, workRules) : null;
+    const live =
+      stored && key === todayKey && entries.some((entry) => entry.end === null)
+        ? workedTime(entries, workRules, nowMinutes)
+        : stored;
+    const hours =
+      (dailyActualHours[key] ?? 0) +
+      (stored && live ? (live.workedMinutes - stored.workedMinutes) / 60 : 0);
+    return { hours, live };
+  };
+
   const cellRefs = useRef(new Map<string, HTMLButtonElement>());
 
   // When the editor is opened from elsewhere (e.g. the punch clock), bring
@@ -213,16 +232,7 @@ export default function CalendarGrid({
     const hasOverride = isWorkingDay
       ? dailyHours[key] !== undefined || hasEntries
       : (extraHours[key] ?? 0) > 0 || hasEntries;
-    // dailyActualHours already applies the time rules; for a running
-    // session swap in the live figure so the cell ticks along.
-    const stored = hasEntries ? workedTime(entries, workRules) : null;
-    const live =
-      hasEntries && isRunning && liveNow !== undefined
-        ? workedTime(entries, workRules, liveNow)
-        : stored;
-    const total =
-      (dailyActualHours[key] ?? 0) +
-      (stored && live ? (live.workedMinutes - stored.workedMinutes) / 60 : 0);
+    const { hours: total, live } = liveDay(key);
     const notes = entries
       .map((entry) => entry.note?.trim())
       .filter(Boolean)
@@ -457,7 +467,7 @@ export default function CalendarGrid({
             if (!cell) {
               return total;
             }
-            return total + (dailyActualHours[dateKey(cell)] ?? 0);
+            return total + liveDay(dateKey(cell)).hours;
           }, 0);
           const weekScheduled = week.reduce(
             (total, cell) =>

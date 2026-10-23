@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarClock, LogIn, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { estimateFinish } from "./calculations";
+import { estimateFinish, workedTime } from "./calculations";
 import { TimeEntry, WorkRules } from "./types";
 import { useNow } from "./useNow";
 import {
@@ -66,6 +66,12 @@ export default function PunchClock({
   const finish =
     isViewingCurrentPeriod && !isStale
       ? estimateFinish(todayEntries, targetHours, breakRules, nowMinutes)
+      : null;
+  // Once today's target is met there's nothing to estimate; say so instead.
+  const overMinutes =
+    isViewingCurrentPeriod && !isStale && !finish && targetHours > 0 && todayEntries.length > 0
+      ? workedTime(todayEntries, { ...breakRules, roundingMinutes: 0 }, nowMinutes)
+          .workedMinutes - targetHours * 60
       : null;
   const progress =
     targetHours > 0 ? Math.min(1, todayHours / targetHours) : todayHours > 0 ? 1 : 0;
@@ -204,6 +210,16 @@ export default function PunchClock({
             <span className="tabular">
               {formatDuration(finish.remainingMinutes / 60)} to go
             </span>
+          </p>
+        ) : null}
+        {overMinutes !== null && overMinutes >= 0 ? (
+          <p className="mt-2 flex items-baseline justify-between font-mono text-[11px] text-ink-muted">
+            <span className="text-ink-foreground">Done for today</span>
+            {overMinutes >= 1 ? (
+              <span className="tabular">
+                +{formatDuration(overMinutes / 60)} over
+              </span>
+            ) : null}
           </p>
         ) : null}
         {isViewingCurrentPeriod && Math.abs(carriedHours) >= 1 / 60 ? (

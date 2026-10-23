@@ -447,6 +447,15 @@ describe("weeklyDayTarget", () => {
     expect(weeklyDayTarget(days, THURSDAY, 45, 5)).toBe(10);
   });
 
+  it("counts days settled by the hour as their share, not what was worked", () => {
+    // A contract change mid-week: Mon–Tue paid by the hour, Wed on a salary.
+    const days = week({ dailyHours: logged(12 + 5 / 60, 11.5, 10 + 55 / 60, 8 + 52 / 60) });
+    const settled = (day: { key: string }) => day.key === "2026-2-2" || day.key === "2026-2-3";
+    // Without it the hourly days leave only 1h 38m; with it, 45 − 18 − 19h 47m.
+    expect(weeklyDayTarget(days, FRIDAY, 45, 5)).toBeCloseTo(1 + 38 / 60);
+    expect(weeklyDayTarget(days, FRIDAY, 45, 5, 0, settled)).toBeCloseTo(7 + 13 / 60);
+  });
+
   it("is 0 on days off, marked days, and once the week is done", () => {
     expect(weeklyDayTarget(week({}), new Date(2026, 2, 7), 45, 5)).toBe(0);
     expect(weeklyDayTarget(week({ exceptions: { "2026-2-6": "sick" } }), FRIDAY, 45, 5)).toBe(0);
