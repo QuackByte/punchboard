@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.2](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.1...punchboard-v1.14.2) (2026-10-23)
+
+
+### Bug Fixes
+
+* count days paid by the hour as their share of a salaried week ([#61](https://github.com/QuackByte/punchboard/issues/61)) ([efc2a14](https://github.com/QuackByte/punchboard/commit/efc2a14a9f1fd4593c53cc550265c89e4fbe02b6))
+
 ## [1.14.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.0...punchboard-v1.14.1) (2026-10-23)
 
 
