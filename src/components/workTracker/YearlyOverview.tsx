@@ -11,6 +11,8 @@ interface YearlyOverviewProps {
   onNextYear: () => void;
   onSelectMonth: (monthKey: string) => void;
   yearlyData: YearlyDataPoint[];
+  /** Vacation in the year shown; allowance 0 means none is tracked. */
+  vacation: { allowance: number; taken: number; booked: number; label: string };
 }
 
 export default function YearlyOverview({
@@ -20,7 +22,10 @@ export default function YearlyOverview({
   onNextYear,
   onSelectMonth,
   yearlyData,
+  vacation,
 }: YearlyOverviewProps) {
+  const vacationUsed = vacation.taken + vacation.booked;
+  const vacationLeft = vacation.allowance - vacationUsed;
   const maxHours = Math.max(
     ...yearlyData.map((monthData) => monthData.actualHours),
     1,
@@ -75,6 +80,45 @@ export default function YearlyOverview({
               {formatDuration(monthlyAverage)}
             </dd>
           </div>
+          {vacation.allowance > 0 || vacationUsed > 0 ? (
+            <div>
+              <dt className="stamp" title={`Leave year ${vacation.label}`}>
+                Vacation
+                {vacation.label !== String(graphYear) ? (
+                  <span className="ml-1 normal-case tracking-normal">
+                    {vacation.label}
+                  </span>
+                ) : null}
+              </dt>
+              <dd className="text-lg font-semibold tabular">
+                {vacationUsed}
+                {vacation.allowance > 0 ? (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {" "}
+                    / {vacation.allowance}d
+                  </span>
+                ) : (
+                  <span className="text-sm font-normal text-muted-foreground">d</span>
+                )}
+              </dd>
+              <dd className="text-[11px] text-muted-foreground">
+                {vacation.booked > 0 ? `${vacation.booked} booked · ` : ""}
+                {vacation.allowance > 0 ? (
+                  <span
+                    className={cn(
+                      vacationLeft < 0 && "text-[hsl(32_90%_32%)] dark:text-vacation",
+                    )}
+                  >
+                    {vacationLeft < 0
+                      ? `${-vacationLeft} over`
+                      : `${vacationLeft} left`}
+                  </span>
+                ) : (
+                  "no allowance set"
+                )}
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </div>
 

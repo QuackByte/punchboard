@@ -613,6 +613,23 @@ h3 {
   border-radius: 50%;
 }
 
+.swatch--balance {
+  background: linear-gradient(90deg, var(--primary) 0 80%, color-mix(in srgb, var(--primary) 15%, transparent) 80%);
+}
+
+.swatch--bank {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--primary) 55%, transparent) 0 40%, transparent 40%);
+}
+
+.swatch--finish {
+  background: radial-gradient(circle, var(--signal) 0 5px, color-mix(in srgb, var(--signal) 18%, transparent) 5.5px);
+  border-radius: 50%;
+}
+
+.swatch--sheet {
+  background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--text) 18%, transparent) 0 1px, transparent 1px 7px);
+}
+
 .receipt {
   padding: 18px 20px;
   border: 1px dashed var(--border);

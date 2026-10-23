@@ -27,8 +27,14 @@ export interface TrayStatus {
   sessionStart: string | null;
   todayKey: string;
   todayEntries: Array<{ start: string; end: string | null }>;
-  /** Scheduled hours for today (0 when it isn't a workday). */
+  /** Whether today is a workday (not off, vacation or sick). */
+  isWorkday?: boolean;
+  /** Today's target hours (0 when it isn't a workday or the week is done). */
   targetHours: number;
+  /** Automatic break rule, for the tray's finish estimate. */
+  breakRules?: { breakMinutes: number; breakAfterHours: number };
+  /** Hours banked (+) or owed (−) from earlier weeks. */
+  carriedHours?: number;
   openSession: {
     key: string;
     entry: { start: string; end: string | null };

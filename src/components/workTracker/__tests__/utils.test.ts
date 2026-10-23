@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dateKey,
   formatDuration,
+  formatLeaveYear,
   getCurrentPayslipEndMonthKey,
   getDatesInPayslipRange,
   keyToDate,
@@ -125,5 +126,17 @@ describe("payslip ranges", () => {
   it("round-trips date keys", () => {
     const date = new Date(2026, 9, 1);
     expect(keyToDate(dateKey(date)).getTime()).toBe(date.getTime());
+  });
+});
+
+describe("formatLeaveYear", () => {
+  it("names a calendar year by its year", () => {
+    expect(formatLeaveYear({ start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) })).toBe("2026");
+  });
+
+  it("names other leave years by their first and last months", () => {
+    expect(formatLeaveYear({ start: new Date(2026, 3, 1), end: new Date(2027, 3, 1) })).toBe(
+      "Apr 2026 – Mar 2027",
+    );
   });
 });

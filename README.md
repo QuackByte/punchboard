@@ -31,16 +31,30 @@ marketing page, or jump straight into the
   Rules apply when hours are counted, so recorded times never change.
 - **Day exceptions** — mark days as vacation, sick leave, or holiday, with
   automatic exclusion from expected working hours.
+- **Vacation allowance** — set the vacation days you get a year and the
+  month your leave year starts; the year view shows days taken, booked and
+  left.
 - **Extra hours** — track hours on days off separately from the schedule.
-- **Salary estimation** — set an hourly rate, tax percentage, and extra
-  deductions to see estimated gross and net pay for the current payslip
-  period (with a configurable payslip start day).
+- **Pay estimation** — paid by the hour or on a fixed salary. A salary is
+  entered as an hourly rate × contracted weekly hours or as a yearly amount,
+  and paid as a twelfth of the year each payslip; overtime is either paid on
+  top or tracked as unpaid, and the payslip shows your effective hourly rate.
+  Tax and extra deductions give estimated gross and net pay for the current
+  payslip period (with a configurable payslip start day).
 - **Currency conversion** — optionally show a second currency alongside your
-  primary one, using a manual conversion rate.
+  primary one on every payslip line, using a manual conversion rate.
+- **Balanced weeks** — today's target is what's left of your weekly hours,
+  shared over the workdays still to come: 40h by Thursday on a 45h week
+  leaves 5h for Friday. Hours over or under carry into the next weeks,
+  optionally resetting each January or capped at a limit.
+- **Finish estimate** — the punch clock shows when you'll be done for the
+  day, automatic break included.
 - **Yearly overview** — a chart of hours worked per month across the year.
-- **Weekly totals** — hours per ISO week against the scheduled hours.
+- **Weekly totals** — hours per ISO week against the scheduled hours, with
+  the hours carried so far.
 - **Timesheet export** — download the period as CSV, or print / save a
-  one-page PDF timesheet with sessions, notes, totals and pay.
+  one-page PDF timesheet with sessions, notes, totals, pay (in both
+  currencies when converting) and vacation used.
 - **Undo** — reset a day or delete a session by mistake? Undo it from the
   toast or with ⌘Z / Ctrl+Z.
 - **Keyboard friendly** — arrow keys move around the time card, Enter edits
@@ -48,7 +62,7 @@ marketing page, or jump straight into the
 - **Menu bar / tray** — a mini punch clock in the menu bar (macOS) or system
   tray, with the running time next to the icon.
 - **Desktop extras** — a global ⌥⌘P / Ctrl+Alt+P punch shortcut, a "still
-  on the clock?" reminder once the day's hours are done, an optional
+  on the clock?" reminder once the day's target is done, an optional
   punch-in nudge on workdays, and open at login.
 - **Import/export** — back up or move your data as a JSON file.
 - **Light/dark theme**.

@@ -55,7 +55,6 @@ describe("timesheetCsv", () => {
     title: "March 2026",
     periodLabel: "1 Mar 2026 – 31 Mar 2026",
     currency: "EUR",
-    hourlyRate: 20,
     taxPercent: 10,
     overtimeMultiplier: 1.5,
   });
@@ -79,6 +78,30 @@ describe("timesheetCsv", () => {
     expect(lines).toContain("Hours worked,168.5");
     expect(lines).toContain("Sick days,1");
     expect(lines.at(-1)).toBe(`Net (EUR),${Math.round(pay.net * 100) / 100}`);
+  });
+});
+
+describe("timesheetCsv with conversion and vacation", () => {
+  const csv = timesheetCsv(rows, period, pay, {
+    title: "March 2026",
+    periodLabel: "1 Mar 2026 – 31 Mar 2026",
+    currency: "EUR",
+    taxPercent: 10,
+    overtimeMultiplier: 1.5,
+    conversion: { currency: "USD", rate: 2 },
+    vacation: { label: "2026", used: 3, allowance: 25 },
+  });
+  const lines = csv.replace(/^\uFEFF/, "").split("\r\n");
+
+  it("lists the vacation used against the allowance", () => {
+    expect(lines).toContain("Vacation days used (2026),3");
+    expect(lines).toContain("Vacation allowance,25");
+  });
+
+  it("repeats every money line in the second currency", () => {
+    expect(lines).toContain("Converted to USD,at 2");
+    expect(lines).toContain(`Gross (USD),${Math.round(pay.gross * 2 * 100) / 100}`);
+    expect(lines.at(-1)).toBe(`Net (USD),${Math.round(pay.net * 2 * 100) / 100}`);
   });
 });
 

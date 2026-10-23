@@ -24,9 +24,35 @@ export interface TimesheetMeta {
   title: string;
   periodLabel: string;
   currency: string;
-  hourlyRate: number;
   taxPercent: number;
   overtimeMultiplier: number;
+  /** Money also given in a second currency. */
+  conversion?: { currency: string; rate: number };
+  /** Vacation in the leave year, when an allowance is set. */
+  vacation?: { label: string; used: number; allowance: number };
+}
+
+/** The payslip's money lines, labelled without a currency. */
+export function payLines(pay: PayResult, meta: TimesheetMeta): Array<[string, number]> {
+  const lines: Array<[string, number]> = [];
+  if (pay.salaried) {
+    lines.push(["Yearly salary", pay.yearly], ["Salary", pay.regularPay]);
+    if (pay.overtimePay > 0) {
+      lines.push([`Overtime pay ×${meta.overtimeMultiplier}`, pay.overtimePay]);
+    }
+  } else if (pay.overtimePay > 0) {
+    lines.push(
+      ["Regular pay", pay.regularPay],
+      [`Overtime pay ×${meta.overtimeMultiplier}`, pay.overtimePay],
+    );
+  }
+  lines.push(
+    ["Gross", pay.gross],
+    [`Tax ${meta.taxPercent}%`, pay.tax],
+    ["Deductions", pay.deductions],
+    ["Net", pay.net],
+  );
+  return lines;
 }
 
 function statusOf(day: DayResult): TimesheetRow["status"] {
@@ -118,22 +144,35 @@ export function timesheetCsv(
     ["Workdays", period.workingDaysCount],
     ["Vacation days", period.vacationDays],
     ["Sick days", period.sickDays],
-    ["Breaks deducted (min)", period.breakMinutesTotal],
-    [`Hourly rate (${meta.currency})`, meta.hourlyRate],
   ];
-
-  if (pay.overtimePay > 0) {
+  if (meta.vacation) {
     lines.push(
-      [`Regular pay (${meta.currency})`, pay.regularPay],
-      [`Overtime pay ×${meta.overtimeMultiplier} (${meta.currency})`, pay.overtimePay],
+      [`Vacation days used (${meta.vacation.label})`, meta.vacation.used],
+      ["Vacation allowance", meta.vacation.allowance],
     );
   }
   lines.push(
-    [`Gross (${meta.currency})`, pay.gross],
-    [`Tax ${meta.taxPercent}% (${meta.currency})`, pay.tax],
-    [`Deductions (${meta.currency})`, pay.deductions],
-    [`Net (${meta.currency})`, pay.net],
+    ["Breaks deducted (min)", period.breakMinutesTotal],
+    [`Hourly rate (${meta.currency})`, pay.rate],
   );
+  if (pay.salaried) {
+    lines.push(
+      [`Effective hourly rate (${meta.currency})`, pay.effectiveRate],
+      ["Unpaid overtime (h)", pay.unpaidOvertimeHours],
+    );
+  }
+
+  const money = payLines(pay, meta);
+  for (const [label, amount] of money) {
+    lines.push([`${label} (${meta.currency})`, amount]);
+  }
+  if (meta.conversion) {
+    const { currency, rate } = meta.conversion;
+    lines.push([], [`Converted to ${currency}`, `at ${rate}`]);
+    for (const [label, amount] of money) {
+      lines.push([`${label} (${currency})`, amount * rate]);
+    }
+  }
 
   // CRLF and a BOM so Excel opens it as UTF-8 with the en dashes intact.
   return "﻿" + lines.map((line) => line.map(csvCell).join(",")).join("\r\n");

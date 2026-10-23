@@ -1,9 +1,11 @@
 import { ArrowRight, CalendarClock, LogIn, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TimeEntry } from "./types";
+import { estimateFinish } from "./calculations";
+import { TimeEntry, WorkRules } from "./types";
 import { useNow } from "./useNow";
 import {
   entryMinutes,
+  formatClock,
   formatDuration,
   keyToDate,
   minutesSinceMidnight,
@@ -15,6 +17,10 @@ interface PunchClockProps {
   todayEntries: TimeEntry[];
   /** Scheduled hours for today (0 when today isn't a workday). */
   targetHours: number;
+  /** Automatic break rule, so the finish estimate includes the break. */
+  breakRules?: Pick<WorkRules, "breakMinutes" | "breakAfterHours">;
+  /** Hours banked (+) or owed (−) from earlier weeks, already in the target. */
+  carriedHours?: number;
   openSession: { key: string; entry: TimeEntry } | null;
   isViewingCurrentPeriod: boolean;
   onPunchIn: () => void;
@@ -34,6 +40,8 @@ export default function PunchClock({
   todayKey,
   todayEntries,
   targetHours,
+  breakRules = NO_BREAK,
+  carriedHours = 0,
   openSession,
   isViewingCurrentPeriod,
   onPunchIn,
@@ -55,6 +63,10 @@ export default function PunchClock({
     : 0;
   const runningMinutes =
     isRunning && openSession ? entryMinutes(openSession.entry, nowMinutes) : 0;
+  const finish =
+    isViewingCurrentPeriod && !isStale
+      ? estimateFinish(todayEntries, targetHours, breakRules, nowMinutes)
+      : null;
   const progress =
     targetHours > 0 ? Math.min(1, todayHours / targetHours) : todayHours > 0 ? 1 : 0;
 
@@ -176,6 +188,31 @@ export default function PunchClock({
             style={{ width: `${progress * 100}%` }}
           />
         </div>
+        {finish ? (
+          <p className="mt-2 flex items-baseline justify-between font-mono text-[11px] text-ink-muted">
+            <span>
+              {isRunning
+                ? "Done at "
+                : todayEntries.length > 0
+                  ? "Back now, done at "
+                  : "Start now, done at "}
+              <span className="text-ink-foreground">
+                {formatClock(finish.finishMinutes)}
+              </span>
+              {finish.finishMinutes >= 1440 ? " tomorrow" : ""}
+            </span>
+            <span className="tabular">
+              {formatDuration(finish.remainingMinutes / 60)} to go
+            </span>
+          </p>
+        ) : null}
+        {isViewingCurrentPeriod && Math.abs(carriedHours) >= 1 / 60 ? (
+          <p className="mt-1 font-mono text-[11px] text-ink-muted">
+            {carriedHours > 0 ? "+" : "−"}
+            {formatDuration(Math.abs(carriedHours))}{" "}
+            {carriedHours > 0 ? "banked from" : "owed from"} earlier weeks
+          </p>
+        ) : null}
       </div>
 
       {todayEntries.length > 0 && isViewingCurrentPeriod ? (
@@ -217,6 +254,8 @@ export default function PunchClock({
     </section>
   );
 }
+
+const NO_BREAK = { breakMinutes: 0, breakAfterHours: 0 };
 
 function PunchButton({
   tone,

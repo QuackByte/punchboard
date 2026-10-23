@@ -134,66 +134,96 @@ interface PaySummaryProps {
   currency: CurrencyCode;
   secondaryCurrency: CurrencyCode;
   showConversion: boolean;
-  hourlyRate: number;
+  conversionRate: number;
   taxPercent: number;
   overtimeMultiplier: number;
   pay: PayResult;
-  grossSalary: number;
-  taxAmount: number;
-  extraDeductionAmount: number;
-  netSalary: number;
-  convertedNetSalary: number;
 }
 
 export function PaySummary({
   currency,
   secondaryCurrency,
   showConversion,
-  hourlyRate,
+  conversionRate,
   taxPercent,
   overtimeMultiplier,
   pay,
-  grossSalary,
-  taxAmount,
-  extraDeductionAmount,
-  netSalary,
-  convertedNetSalary,
 }: PaySummaryProps) {
+  /** An amount in the primary currency and, when converting, the secondary. */
+  const amount = (value: number, sign = "") => ({
+    value: `${sign}${formatMoney(value, currency)}`,
+    converted: showConversion
+      ? `${sign}${formatMoney(value * conversionRate, secondaryCurrency)}`
+      : undefined,
+  });
+
   return (
     <section aria-label="Estimated pay" className="panel flex flex-col p-5">
       <div className="flex items-center justify-between">
         <span className="stamp">03 · Payslip</span>
         <span className="font-mono text-[11px] text-muted-foreground">
-          {formatMoney(hourlyRate, currency)}/h
+          {formatMoney(pay.rate, currency)}/h
+          {pay.salaried && pay.effectiveRate > 0 ? (
+            <span
+              title="Gross over the hours worked"
+              className={cn(pay.effectiveRate < pay.rate - 0.005 && "text-extra")}
+            >
+              {" · "}
+              {formatMoney(pay.effectiveRate, currency)}/h worked
+            </span>
+          ) : null}
+          {!pay.salaried && pay.yearly > 0 ? (
+            <span title="At the scheduled weekly hours, 52 weeks">
+              {" · ≈"}
+              {formatMoney(pay.yearly, currency)}/yr
+            </span>
+          ) : null}
         </span>
       </div>
 
       <dl className="mb-4 mt-4 space-y-1.5 font-mono text-[13px]">
-        {pay.overtimePay > 0 ? (
+        {showConversion ? (
+          <div className="flex justify-end gap-3 text-[10.5px] uppercase tracking-wider text-muted-foreground/70">
+            <span>{currency}</span>
+            <span className={CONVERTED_COLUMN}>{secondaryCurrency}</span>
+          </div>
+        ) : null}
+        {pay.salaried ? (
+          <>
+            <ReceiptLine label="Yearly" {...amount(pay.yearly)} muted />
+            <ReceiptLine label="Salary ÷ 12" {...amount(pay.regularPay)} muted />
+            {pay.overtimePay > 0 ? (
+              <ReceiptLine
+                label={`Overtime ${formatDuration(pay.overtimeHours)} ×${overtimeMultiplier}`}
+                {...amount(pay.overtimePay, "+")}
+                accent
+              />
+            ) : null}
+            {pay.unpaidOvertimeHours > 0 ? (
+              <ReceiptLine
+                label={`Unpaid overtime ${formatDuration(pay.unpaidOvertimeHours)}`}
+                {...amount(0)}
+                muted
+              />
+            ) : null}
+          </>
+        ) : pay.overtimePay > 0 ? (
           <>
             <ReceiptLine
               label={`Regular ${formatDuration(pay.regularHours)}`}
-              value={formatMoney(pay.regularPay, currency)}
+              {...amount(pay.regularPay)}
               muted
             />
             <ReceiptLine
               label={`Overtime ${formatDuration(pay.overtimeHours)} ×${overtimeMultiplier}`}
-              value={`+${formatMoney(pay.overtimePay, currency)}`}
+              {...amount(pay.overtimePay, "+")}
               accent
             />
           </>
         ) : null}
-        <ReceiptLine label="Gross" value={formatMoney(grossSalary, currency)} />
-        <ReceiptLine
-          label={`Tax ${taxPercent}%`}
-          value={`−${formatMoney(taxAmount, currency)}`}
-          muted
-        />
-        <ReceiptLine
-          label="Deductions"
-          value={`−${formatMoney(extraDeductionAmount, currency)}`}
-          muted
-        />
+        <ReceiptLine label="Gross" {...amount(pay.gross)} />
+        <ReceiptLine label={`Tax ${taxPercent}%`} {...amount(pay.tax, "−")} muted />
+        <ReceiptLine label="Deductions" {...amount(pay.deductions, "−")} muted />
       </dl>
 
       <div className="perforation mt-auto pt-0" aria-hidden />
@@ -202,11 +232,11 @@ export function PaySummary({
         <span className="stamp mb-1.5">Net pay</span>
         <div className="text-right">
           <p className="font-mono text-[34px] font-semibold leading-none tracking-tight tabular">
-            {formatMoney(netSalary, currency)}
+            {formatMoney(pay.net, currency)}
           </p>
           {showConversion ? (
             <p className="mt-1.5 font-mono text-xs text-muted-foreground">
-              ≈ {formatMoney(convertedNetSalary, secondaryCurrency)}
+              ≈ {formatMoney(pay.net * conversionRate, secondaryCurrency)}
             </p>
           ) : null}
         </div>
@@ -215,14 +245,19 @@ export function PaySummary({
   );
 }
 
+const CONVERTED_COLUMN = "w-[6.5rem] shrink-0 text-right";
+
 function ReceiptLine({
   label,
   value,
+  converted,
   muted = false,
   accent = false,
 }: {
   label: string;
   value: string;
+  /** The same amount in the secondary currency. */
+  converted?: string;
   muted?: boolean;
   accent?: boolean;
 }) {
@@ -239,6 +274,16 @@ function ReceiptLine({
       >
         {value}
       </dd>
+      {converted !== undefined ? (
+        <dd
+          className={cn(
+            CONVERTED_COLUMN,
+            "ml-3 text-[11.5px] tabular text-muted-foreground",
+          )}
+        >
+          {converted}
+        </dd>
+      ) : null}
     </div>
   );
 }
