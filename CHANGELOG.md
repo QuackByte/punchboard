@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.14.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.13.1...punchboard-v1.14.0) (2026-10-23)
+
+
+### Features
+
+* add currency conversion and vacation used to timesheet exports ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* balance today's target across the week ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* carry hours over or under into the next weeks, optionally reset each January or capped ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* show every payslip line in the second currency ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* show when today's hours will be done, automatic break included ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* track a yearly vacation allowance with a configurable leave year ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+* track pay on a fixed salary ([#57](https://github.com/QuackByte/punchboard/issues/57)) ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+
+
+### Bug Fixes
+
+* keep desktop reminders on workdays the balanced week leaves no hours for ([30f50c7](https://github.com/QuackByte/punchboard/commit/30f50c7dc72bcbd7375a9bbee9a3b8987baedd81))
+
 ## [1.13.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.13.0...punchboard-v1.13.1) (2026-10-21)
 
 
