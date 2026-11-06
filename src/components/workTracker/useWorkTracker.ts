@@ -63,6 +63,7 @@ import {
   normalizeWorkRules,
   balanceSource,
   BalanceSource,
+  balanceNow,
   carriedBalance,
   weeklyDayTarget,
   weeklyHoursOf,
@@ -2009,6 +2010,35 @@ export function useWorkTracker() {
     // `today` changes identity every render; todayKey captures the date.
   }, [calendarCells, balanceSources, workRules, todayKey]);
 
+  /**
+   * `weekBalances` as of `nowMinutes`: this week's also takes today into
+   * account (see `balanceNow`), with any running session up to then.
+   */
+  const weekBalancesAt = (nowMinutes: number) => {
+    const thisWeek = dateKey(
+      new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() - ((today.getDay() + 6) % 7),
+      ),
+    );
+    if (weekBalances[thisWeek] === undefined) return weekBalances;
+    const { entries } = trayToday;
+    const runningMinutes =
+      workedTime(entries, workRules, nowMinutes).workedMinutes -
+      workedTime(entries, workRules).workedMinutes;
+    return {
+      ...weekBalances,
+      [thisWeek]: balanceNow(
+        balanceSources,
+        today,
+        workRules,
+        todayTarget,
+        runningMinutes / 60,
+      ),
+    };
+  };
+
   const selectedMonthInfo = useMemo(() => {
     const { year, monthIndex } = parseMonthKey(monthKey);
     return {
@@ -2121,7 +2151,7 @@ export function useWorkTracker() {
     onLeaveYearStartMonthChange,
     vacationYear,
     periodVacation,
-    weekBalances,
+    weekBalancesAt,
     onDefaultHoursChange,
     exceptionSummary,
     actualHours,

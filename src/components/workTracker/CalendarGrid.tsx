@@ -43,8 +43,8 @@ interface CalendarGridProps {
   timeEntries: Record<string, TimeEntry[]>;
   hoursPerDay: number;
   workRules: WorkRules;
-  /** Carried balance after each week, by the week's Monday key. */
-  weekBalances: Record<string, number>;
+  /** Carried balance after each week as of a time, by the week's Monday key. */
+  weekBalancesAt: (nowMinutes: number) => Record<string, number>;
   today: Date;
   /** Bumped to move keyboard focus to today's cell. */
   focusTodayRequest: number;
@@ -152,7 +152,7 @@ export default function CalendarGrid({
   timeEntries,
   hoursPerDay,
   workRules,
-  weekBalances,
+  weekBalancesAt,
   today,
   focusTodayRequest,
   editingKey,
@@ -165,6 +165,7 @@ export default function CalendarGrid({
 }: CalendarGridProps) {
   const now = useNow(30_000);
   const nowMinutes = minutesSinceMidnight(now);
+  const weekBalances = weekBalancesAt(nowMinutes);
   const todayKey = dateKey(today);
 
   /**
@@ -505,7 +506,7 @@ export default function CalendarGrid({
                     ) : null}
                     {balance !== undefined && Math.abs(balance) >= 1 / 60 ? (
                       <span
-                        title="Hours carried so far"
+                        title="Your balance across all weeks, not just this one. Today counts once you reach its target."
                         className={cn(
                           "mt-0.5 rounded-full px-1.5 font-mono text-[9.5px] tabular",
                           balance > 0

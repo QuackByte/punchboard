@@ -447,7 +447,7 @@ export default function WorkTracker() {
                 timeEntries={timeEntries}
                 hoursPerDay={hoursPerDay}
                 workRules={tracker.workRules}
-                weekBalances={tracker.weekBalances}
+                weekBalancesAt={tracker.weekBalancesAt}
                 today={today}
                 focusTodayRequest={focusTodayRequest}
                 editingKey={editingKey}

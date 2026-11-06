@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computePay,
+  balanceNow,
   balanceSource,
   carriedBalance,
   computePeriod,
@@ -626,6 +627,81 @@ describe("carriedBalance", () => {
   it("starts from the later of the start date and 1 January", () => {
     const rulesBoth = { ...noLimits, balanceResetsYearly: true, balanceStartDate: "2025-06-01" };
     expect(carriedBalance(sources, MONDAY, rulesBoth)).toBe(1);
+  });
+});
+
+describe("balanceNow", () => {
+  // A 45h week with 1h banked on each of Mon-Thu, so Friday's target is 5h.
+  const FRIDAY = new Date(2026, 2, 6);
+  const WEEK = { "2026-2-2": 10, "2026-2-3": 10, "2026-2-4": 10, "2026-2-5": 10 };
+  const noLimits = { balanceResetsYearly: false, balanceCapHours: 0, balanceStartDate: "" };
+  const target = { hours: 5, isWorkday: true };
+  const sources = (patch: Partial<TrackerData> = {}, overtimePaid = false) => [
+    {
+      days: computePeriod(data({ hoursPerDay: 9, ...patch }), MONTH, START_DAY, rules()).days,
+      share: 9,
+      overtimePaid,
+    },
+  ];
+  const friday = (hours: number) => ({ dailyHours: { ...WEEK, "2026-2-6": hours } });
+
+  it("leaves today out until its target is met", () => {
+    expect(balanceNow(sources(friday(3)), FRIDAY, noLimits, target)).toBe(4);
+  });
+
+  it("counts today once its target is met", () => {
+    expect(balanceNow(sources(friday(5)), FRIDAY, noLimits, target)).toBe(0);
+    expect(balanceNow(sources(friday(6)), FRIDAY, noLimits, target)).toBe(1);
+  });
+
+  it("doesn't take a day with nothing logged for its schedule", () => {
+    const scheduled = sources({ dailyHours: WEEK });
+    expect(balanceNow(scheduled, FRIDAY, noLimits, target)).toBe(4);
+    expect(balanceNow(scheduled, FRIDAY, noLimits, { hours: 0, isWorkday: true })).toBe(4);
+  });
+
+  it("counts a running session towards the target and the balance", () => {
+    expect(balanceNow(sources(friday(3)), FRIDAY, noLimits, target, 1)).toBe(4);
+    expect(balanceNow(sources(friday(3)), FRIDAY, noLimits, target, 3)).toBe(1);
+  });
+
+  it("waits for the punch-out when overtime is paid on top", () => {
+    expect(balanceNow(sources(friday(3), true), FRIDAY, noLimits, target, 3)).toBe(4);
+  });
+
+  it("counts a day that isn't a plain workday at once", () => {
+    const dayOff = { hours: 0, isWorkday: false };
+    const saturday = sources({ dailyHours: WEEK, extraHours: { "2026-2-7": 2 } });
+    expect(balanceNow(saturday, new Date(2026, 2, 7), noLimits, dayOff)).toBe(6);
+    const vacation = sources({
+      dailyHours: WEEK,
+      defaultHours: 9,
+      exceptions: { "2026-2-6": "vacation" },
+    });
+    expect(balanceNow(vacation, FRIDAY, noLimits, dayOff)).toBe(4);
+  });
+
+  it("stays within the cap with a running session", () => {
+    const capped = { ...noLimits, balanceCapHours: 2 };
+    expect(balanceNow(sources(friday(3)), FRIDAY, capped, target, 9)).toBe(2);
+  });
+
+  it("keeps the year's balance on 31 December when it resets yearly", () => {
+    const december = [
+      {
+        days: computePeriod(
+          data({ hoursPerDay: 9, dailyHours: { "2025-11-1": 10, "2025-11-31": 10 } }),
+          "2026-01",
+          START_DAY,
+          rules(),
+        ).days,
+        share: 9,
+        overtimePaid: false,
+      },
+    ];
+    const resets = { ...noLimits, balanceResetsYearly: true };
+    const lastDay = new Date(2025, 11, 31);
+    expect(balanceNow(december, lastDay, resets, { hours: 9, isWorkday: true })).toBe(2);
   });
 });
 
