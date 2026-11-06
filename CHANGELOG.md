@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.3](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.2...punchboard-v1.14.3) (2026-11-06)
+
+
+### Bug Fixes
+
+* count today in the week's balance once its target is met ([#63](https://github.com/QuackByte/punchboard/issues/63)) ([37a04cc](https://github.com/QuackByte/punchboard/commit/37a04cc871bc379e8c03b1654d112bdc11a4beca))
+
 ## [1.14.2](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.1...punchboard-v1.14.2) (2026-10-23)
 
 

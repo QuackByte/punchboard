@@ -2,7 +2,7 @@
   "name": "punchboard",
   "description": "Desktop app to track daily work hours",
   "private": true,
-  "version": "1.14.2",
+  "version": "1.14.3",
   "license": "MIT",
   "author": "QuackByte (https://quackbyte.dev)",
   "repository": {
