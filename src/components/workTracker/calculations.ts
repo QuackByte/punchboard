@@ -371,6 +371,56 @@ export function carriedBalance(
   return cap > 0 ? Math.min(cap, Math.max(-cap, balance)) : balance;
 }
 
+/**
+ * The balance as it stands today. Today joins it once its target is met, so
+ * it doesn't read as hours owed while the day is still being worked; a day
+ * that isn't a plain workday has no target and joins at once.
+ *
+ * `runningHours` is what a running session has added so far. With overtime
+ * paid on top, some of it may not bank, so it waits for the punch-out.
+ */
+export function balanceNow(
+  sources: BalanceSource[],
+  today: Date,
+  rules: Pick<WorkRules, "balanceResetsYearly" | "balanceCapHours" | "balanceStartDate">,
+  target: { hours: number; isWorkday: boolean },
+  runningHours = 0,
+): number {
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const isToday = (day: DayResult) => day.date.getTime() === startOfToday.getTime();
+  const period = sources.find((source) => source.days.some(isToday));
+  const day = period?.days.find(isToday);
+  const running = period?.overtimePaid ? 0 : runningHours;
+
+  // A workday with nothing logged only has its schedule's hours.
+  const logged = (day && day.source !== "scheduled" ? day.hours : 0) + running;
+  const counts = !target.isWorkday || (logged > 0 && logged >= target.hours - 1e-9);
+  if (!counts) return carriedBalance(sources, startOfToday, rules);
+
+  const withRunning = sources.map((source) =>
+    source === period
+      ? {
+          ...source,
+          days: source.days.map((candidate) =>
+            candidate === day ? { ...candidate, hours: candidate.hours + running } : candidate,
+          ),
+        }
+      : source,
+  );
+  // The end of today, not tomorrow: on 31 December a yearly reset would
+  // otherwise take effect a day early.
+  const endOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+  return carriedBalance(withRunning, endOfToday, rules);
+}
+
 /** A "YYYY-MM-DD" date as local midnight. */
 function keyToStartDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);

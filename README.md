@@ -48,7 +48,8 @@ marketing page, or jump straight into the
   leaves 5h for Friday. On a salary, hours over or under carry into the
   next weeks (only unpaid ones: hourly periods and overtime paid on top
   don't bank), optionally from a start date, resetting each January or
-  capped at a limit.
+  capped at a limit. Each week shows the balance so far; today joins it once
+  you reach today's target.
 - **Finish estimate** — the punch clock shows when you'll be done for the
   day, automatic break included.
 - **Yearly overview** — a chart of hours worked per month across the year.
