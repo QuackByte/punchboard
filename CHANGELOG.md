@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.4](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.3...punchboard-v1.14.4) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** update Electron to 45.2.3 ([#66](https://github.com/QuackByte/punchboard/issues/66)) ([1aa3336](https://github.com/QuackByte/punchboard/commit/1aa333606d079f131dda8e921923ef48262fe12d))
+
 ## [1.14.3](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.2...punchboard-v1.14.3) (2026-11-06)
 
 
