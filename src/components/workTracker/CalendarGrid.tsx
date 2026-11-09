@@ -260,7 +260,7 @@ export default function CalendarGrid({
           }
         }}
         className={cn(
-          "group relative flex h-[68px] w-full flex-col rounded-lg border p-1.5 text-left sm:h-[92px] sm:rounded-xl sm:p-2.5 outline-none transition-[transform,box-shadow,background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring hover:-translate-y-px hover:shadow-md active:translate-y-0 data-[state=open]:ring-2 data-[state=open]:ring-primary",
+          "group relative flex h-[68px] w-full flex-col rounded-lg border p-1.5 text-left sm:h-[92px] sm:rounded-xl sm:p-2.5 outline-hidden transition-[transform,box-shadow,background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring hover:-translate-y-px hover:shadow-md active:translate-y-0 data-[state=open]:ring-2 data-[state=open]:ring-primary",
           exceptionType === "vacation"
             ? "border-vacation/40 bg-[repeating-linear-gradient(135deg,hsl(var(--vacation)/0.16)_0_6px,hsl(var(--vacation)/0.08)_6px_12px)]"
             : exceptionType === "sick"

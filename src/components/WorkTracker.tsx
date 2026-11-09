@@ -250,7 +250,7 @@ export default function WorkTracker() {
               <img
                 src="./punchboard_icon.svg"
                 alt=""
-                className="h-9 w-9 rounded-[10px] shadow-sm"
+                className="h-9 w-9 rounded-[10px] shadow-xs"
               />
               <div className="leading-none">
                 <p className="text-[19px] font-bold tracking-tight">Punchboard</p>
@@ -260,7 +260,7 @@ export default function WorkTracker() {
               </div>
             </div>
 
-            <div className="order-last col-span-2 flex justify-center lg:order-none lg:col-span-1">
+            <div className="order-last col-span-2 flex justify-center lg:order-0 lg:col-span-1">
               <MonthNavigator
                 monthKey={monthKey}
                 year={selectedMonthInfo.year}
@@ -283,7 +283,7 @@ export default function WorkTracker() {
                     "hidden h-9 rounded-xl text-xs text-muted-foreground sm:inline-flex",
                   )}
                 >
-                  <Download className="!h-3.5 !w-3.5" />
+                  <Download className="h-3.5! w-3.5!" />
                   Desktop app
                 </a>
               ) : null}
@@ -291,7 +291,7 @@ export default function WorkTracker() {
                 <DropdownMenuTrigger
                   aria-label="Export timesheet"
                   title="Export timesheet"
-                  className="grid h-9 w-9 place-items-center rounded-xl border bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                  className="grid h-9 w-9 place-items-center rounded-xl border bg-card/80 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
                 >
                   <FileDown className="h-4 w-4" />
                 </DropdownMenuTrigger>
@@ -319,7 +319,7 @@ export default function WorkTracker() {
                 aria-label="Settings"
                 title={`Settings (${shortcutLabel})`}
                 onClick={() => setShowConfig(!showConfig)}
-                className="grid h-9 w-9 place-items-center rounded-xl border bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                className="grid h-9 w-9 place-items-center rounded-xl border bg-card/80 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
               >
                 <Settings2 className="h-4 w-4" />
               </button>

@@ -36,7 +36,7 @@ export default function MonthNavigator({
   const [pickerYear, setPickerYear] = useState(year);
 
   return (
-    <div className="flex items-center gap-1 rounded-2xl border bg-card/80 p-1 shadow-sm backdrop-blur">
+    <div className="flex items-center gap-1 rounded-2xl border bg-card/80 p-1 shadow-xs backdrop-blur-sm">
       <Button
         variant="ghost"
         size="icon"
@@ -57,7 +57,7 @@ export default function MonthNavigator({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex min-w-[11.5rem] flex-col items-center rounded-xl px-3 py-1 outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-w-46 flex-col items-center rounded-xl px-3 py-1 outline-hidden transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="flex items-center gap-1 text-[15px] font-semibold leading-tight">
               {new Date(year, monthIndex, 1).toLocaleDateString("en-GB", {

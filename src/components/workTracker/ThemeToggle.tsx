@@ -21,7 +21,7 @@ export default function ThemeToggle({
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="flex items-center rounded-xl border bg-card/80 p-0.5 backdrop-blur"
+      className="flex items-center rounded-xl border bg-card/80 p-0.5 backdrop-blur-sm"
     >
       {options.map(({ value, label, Icon }) => (
         <button

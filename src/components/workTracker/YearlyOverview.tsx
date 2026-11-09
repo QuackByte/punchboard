@@ -136,7 +136,7 @@ export default function YearlyOverview({
               type="button"
               onClick={() => onSelectMonth(monthData.monthKey)}
               aria-label={`${monthData.month} ${graphYear}: ${formatDuration(monthData.actualHours)}`}
-              className="group flex h-full flex-col items-center justify-end gap-1.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex h-full flex-col items-center justify-end gap-1.5 rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span
                 className={cn(
