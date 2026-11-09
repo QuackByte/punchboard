@@ -57,7 +57,7 @@ export default function TrayPanel() {
       <button
         type="button"
         onClick={openMain}
-        className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-ink-muted transition-colors hover:bg-ink-foreground/[0.06] hover:text-ink-foreground"
+        className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-medium text-ink-muted transition-colors hover:bg-ink-foreground/6 hover:text-ink-foreground"
       >
         <AppWindow className="h-3.5 w-3.5" /> Open Punchboard
       </button>
@@ -66,7 +66,7 @@ export default function TrayPanel() {
         aria-label="More options"
         title="More options"
         onClick={() => desktop?.showTrayMenu()}
-        className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-ink-foreground/[0.06] hover:text-ink-foreground"
+        className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-ink-foreground/6 hover:text-ink-foreground"
       >
         <Ellipsis className="h-4 w-4" />
       </button>

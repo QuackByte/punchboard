@@ -245,7 +245,7 @@ export function PaySummary({
   );
 }
 
-const CONVERTED_COLUMN = "w-[6.5rem] shrink-0 text-right";
+const CONVERTED_COLUMN = "w-26 shrink-0 text-right";
 
 function ReceiptLine({
   label,

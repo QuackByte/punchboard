@@ -236,7 +236,7 @@ export default function PunchClock({
           {todayEntries.map((entry, index) => (
             <li
               key={`${entry.start}-${index}`}
-              className="flex items-center gap-1 rounded-md border border-ink-border bg-ink-foreground/[0.04] px-2 py-1 font-mono text-[11px]"
+              className="flex items-center gap-1 rounded-md border border-ink-border bg-ink-foreground/4 px-2 py-1 font-mono text-[11px]"
             >
               {entry.start}
               <ArrowRight className="h-3 w-3 text-ink-muted" />
@@ -287,13 +287,13 @@ function PunchButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-ink [&_svg]:h-4 [&_svg]:w-4 [&_svg]:transition-transform group-hover:[&_svg]:translate-x-0.5",
+        "group flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-ink [&_svg]:h-4 [&_svg]:w-4 [&_svg]:transition-transform [&_svg]:group-hover:translate-x-0.5",
         tone === "brand" &&
           "bg-brand text-[hsl(195_80%_9%)] shadow-[0_0_0_1px_hsl(var(--brand)/0.5),0_10px_30px_-10px_hsl(var(--brand)/0.7)] hover:brightness-110",
         tone === "signal" &&
           "bg-signal text-[hsl(18_80%_10%)] shadow-[0_0_0_1px_hsl(var(--signal)/0.5),0_10px_30px_-10px_hsl(var(--signal)/0.7)] hover:brightness-110",
         tone === "neutral" &&
-          "border border-ink-border bg-ink-foreground/[0.06] text-ink-foreground hover:bg-ink-foreground/10",
+          "border border-ink-border bg-ink-foreground/6 text-ink-foreground hover:bg-ink-foreground/10",
       )}
     >
       {children}

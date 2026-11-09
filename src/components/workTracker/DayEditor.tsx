@@ -154,7 +154,7 @@ export default function DayEditor({
                 spellCheck={false}
                 value={text}
                 placeholder="9-13, 14-18:30  or  7.5"
-                className="h-9 min-w-0 flex-1 bg-transparent px-3 font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+                className="h-9 min-w-0 flex-1 bg-transparent px-3 font-mono text-sm outline-hidden placeholder:text-muted-foreground/60"
                 onChange={(event) => {
                   setText(event.target.value);
                   setIsInvalid(false);
@@ -222,7 +222,7 @@ export default function DayEditor({
                     />
                     <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                     {entry.end === null && isToday ? (
-                      <span className="flex h-7 w-[4.5rem] items-center gap-1.5 font-mono text-sm text-signal">
+                      <span className="flex h-7 w-18 items-center gap-1.5 font-mono text-sm text-signal">
                         <span className="h-1.5 w-1.5 animate-punch-pulse rounded-full bg-signal" />
                         now
                       </span>
@@ -356,7 +356,7 @@ function NoteField({
             event.currentTarget.blur();
           }
         }}
-        className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
+        className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-hidden placeholder:text-muted-foreground/50"
       />
     </div>
   );
@@ -380,7 +380,7 @@ function TimeField({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
-        "h-7 w-[4.5rem] rounded-md bg-transparent px-1 font-mono text-sm tabular outline-none transition-colors hover:bg-muted focus:bg-muted focus:ring-1 focus:ring-primary",
+        "h-7 w-18 rounded-md bg-transparent px-1 font-mono text-sm tabular outline-hidden transition-colors hover:bg-muted focus:bg-muted focus:ring-1 focus:ring-primary",
         invalid && "ring-1 ring-vacation",
       )}
     />
