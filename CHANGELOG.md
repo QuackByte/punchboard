@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.4...punchboard-v1.15.0) (2026-11-12)
+
+
+### Features
+
+* reload the data file when another device changes it ([#73](https://github.com/QuackByte/punchboard/issues/73)) ([1110756](https://github.com/QuackByte/punchboard/commit/1110756bcd8ab56f34feaed7b27bb530ffc7e25b))
+
 ## [1.14.4](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.3...punchboard-v1.14.4) (2026-11-09)
 
 
