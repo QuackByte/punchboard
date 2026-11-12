@@ -1,4 +1,5 @@
 const REPO = "QuackByte/punchboard";
+const ANDROID_REPO = "QuackByte/Punchboard-Android";
 const FALLBACK_URL = `https://github.com/${REPO}/releases/latest`;
 
 async function loadReleaseLinks() {
@@ -43,10 +44,33 @@ async function loadReleaseLinks() {
   }
 }
 
+/**
+ * The Android links point at releases/latest/download/Punchboard.apk, which
+ * always serves the newest APK; this only fills in its version number.
+ */
+async function loadAndroidVersion() {
+  const versionEls = document.querySelectorAll("[data-android-version]");
+  if (versionEls.length === 0) return;
+  try {
+    const response = await fetch(`https://api.github.com/repos/${ANDROID_REPO}/releases/latest`);
+    if (!response.ok) return;
+    const release = await response.json();
+    if (release.tag_name) {
+      versionEls.forEach((el) => {
+        el.textContent = release.tag_name.replace(/^punchboard-android-v/, "v");
+      });
+    }
+  } catch {
+    // Keep "latest".
+  }
+}
+
 function highlightVisitorPlatform() {
   const platform = `${navigator.platform || ""} ${navigator.userAgent || ""}`;
   let key = null;
-  if (/Mac/i.test(platform)) key = "mac";
+  // Android user agents also say "Linux", so check it first.
+  if (/Android/i.test(platform)) key = "android";
+  else if (/Mac/i.test(platform)) key = "mac";
   else if (/Win/i.test(platform)) key = "win";
   else if (/Linux/i.test(platform)) key = "linux";
 
@@ -56,4 +80,5 @@ function highlightVisitorPlatform() {
 }
 
 loadReleaseLinks();
+loadAndroidVersion();
 highlightVisitorPlatform();

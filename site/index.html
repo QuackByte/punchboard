@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Punchboard — punch in, know your pay</title>
-  <meta name="description" content="A free, open-source time card for your desktop and browser. Punch in and out, log sessions by typing 9-13, 14-18, track vacation and sick days, and see your estimated pay. Your data stays in a file you control." />
+  <meta name="description" content="A free, open-source time card for your desktop, browser and Android phone. Punch in and out, log sessions by typing 9-13, 14-18, track vacation and sick days, and see your estimated pay. Your data stays in a file you control." />
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#f2efe8" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#0c0f14" media="(prefers-color-scheme: dark)" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Punchboard — punch in, know your pay" />
-  <meta property="og:description" content="A free, open-source time card for your desktop and browser. Your data stays in a file you control." />
+  <meta property="og:description" content="A free, open-source time card for your desktop, browser and Android phone. Your data stays in a file you control." />
   <meta property="og:image" content="https://quackbyte.dev/punchboard/assets/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
@@ -30,6 +30,7 @@
       </a>
       <nav class="site-nav" aria-label="Main">
         <a href="#features">Features</a>
+        <a href="#android">Android</a>
         <a href="#downloads">Download</a>
         <a href="https://github.com/QuackByte/punchboard" target="_blank" rel="noopener">GitHub</a>
         <a class="button button--ink" href="./app/">Open the app</a>
@@ -57,6 +58,11 @@
             <a class="button button--primary button--large" href="./app/">Open in your browser</a>
             <a class="button button--ghost button--large" href="#downloads">Download for desktop</a>
           </div>
+
+          <a class="hero__news" href="#android">
+            <span class="hero__news-tag">New</span>
+            Punchboard for Android is here <span aria-hidden="true">→</span>
+          </a>
 
           <div class="typer" aria-hidden="true">
             <span class="typer__label">Quick entry</span>
@@ -100,6 +106,7 @@
             <li>Punch from the <strong>menu bar or system tray</strong> without opening the window</li>
             <li>Optionally <strong>open at login</strong>, so it's there when you sit down</li>
             <li>Forgot to punch out yesterday? It asks for an end time instead of guessing</li>
+            <li>On Android, punch from a <strong>Live Update</strong>, a Quick Settings tile or a widget</li>
           </ul>
         </div>
         <picture class="spotlight__media spotlight__media--clock">
@@ -239,11 +246,50 @@
       </div>
     </section>
 
+    <!-- Android -->
+    <section id="android" class="android">
+      <div class="container android__inner">
+        <div class="android__copy">
+          <p class="stamp">05 · Android <span class="stamp__new">New</span></p>
+          <h2>Now in your pocket.</h2>
+          <p>
+            Punchboard for Android is the same time card on your phone — same look,
+            same numbers. Point it at the <code>punchboard.json</code> your desktop app
+            uses and the two stay in sync: punch in on the way in, see it on your
+            desktop when you sit down.
+          </p>
+          <ul class="checklist">
+            <li>A <strong>Live Update</strong> counts up today's time in the status bar and on the lock screen</li>
+            <li>Punch from the notification, a <strong>Quick Settings tile</strong> or a <strong>home-screen widget</strong></li>
+            <li>Reminders to punch in, and a nudge when today's hours are done</li>
+            <li>Time card, year view, payslip and timesheets, in light and dark</li>
+          </ul>
+          <div class="android__actions">
+            <a class="button button--primary button--large" data-download="android" href="https://github.com/QuackByte/Punchboard-Android/releases/latest/download/Punchboard.apk">Download the APK</a>
+            <a class="button button--ghost button--large" href="https://github.com/QuackByte/Punchboard-Android" target="_blank" rel="noopener">View on GitHub</a>
+          </div>
+          <p class="android__note">
+            Android 8.0 or newer · Free, open source, no account.
+            Open the APK on your phone to install it — it isn't on Google Play.
+          </p>
+        </div>
+        <div class="android__media">
+          <picture class="android__phone">
+            <source srcset="./assets/screens/android-today-dark.webp" media="(prefers-color-scheme: dark)" />
+            <img src="./assets/screens/android-today-light.webp" width="540" height="1212" loading="lazy"
+              alt="Punchboard on Android: the punch clock, on the clock since 07:58, with today's progress and a Punch out button." />
+          </picture>
+          <img class="android__live" src="./assets/screens/android-live-update.webp" width="512" height="232" loading="lazy"
+            alt="The Live Update notification: on the clock since 07:58, today 1h 59m of 8h 41m, done at 17:09, with a Punch out button." />
+        </div>
+      </div>
+    </section>
+
     <!-- Downloads -->
     <section id="downloads" class="downloads">
       <div class="container">
-        <p class="stamp">05 · Download</p>
-        <h2>Get it on your desktop.</h2>
+        <p class="stamp">06 · Download</p>
+        <h2>Get it on your desktop and phone.</h2>
         <p class="downloads__subtitle">
           Free, open source, MIT licensed. Current version: <strong data-version>—</strong>
         </p>
@@ -266,9 +312,16 @@
             <span class="ticket__alt">Most x64 distributions</span>
             <span class="ticket__cta">Download →</span>
           </a>
+          <a class="ticket" data-platform-card="android" data-download="android" href="https://github.com/QuackByte/Punchboard-Android/releases/latest/download/Punchboard.apk">
+            <span class="ticket__os">Android</span>
+            <span class="ticket__meta">Signed APK · <span data-android-version>latest</span></span>
+            <span class="ticket__alt">Android 8.0 and newer</span>
+            <span class="ticket__cta">Download →</span>
+          </a>
         </div>
         <p class="downloads__all">
-          Or browse <a href="https://github.com/QuackByte/punchboard/releases" target="_blank" rel="noopener">all releases on GitHub</a>.
+          Or browse all releases on GitHub for <a href="https://github.com/QuackByte/punchboard/releases" target="_blank" rel="noopener">desktop</a>
+          and <a href="https://github.com/QuackByte/Punchboard-Android/releases" target="_blank" rel="noopener">Android</a>.
         </p>
       </div>
     </section>
@@ -279,6 +332,7 @@
       <p>&copy; 2026 <a href="https://quackbyte.dev" target="_blank" rel="noopener">QuackByte</a> · <a href="https://github.com/QuackByte/punchboard/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></p>
       <div class="site-footer__links">
         <a href="https://github.com/QuackByte/punchboard" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/QuackByte/Punchboard-Android" target="_blank" rel="noopener">Android</a>
         <a href="./app/">Open the app</a>
       </div>
     </div>
