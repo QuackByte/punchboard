@@ -68,6 +68,9 @@ marketing page, or jump straight into the
   on the clock?" reminder once the day's target is done, an optional
   punch-in nudge on workdays, and open at login.
 - **Import/export** — back up or move your data as a JSON file.
+- **Android app** — [Punchboard for Android](https://github.com/QuackByte/Punchboard-Android)
+  can sync with the same data file (through Drive, Dropbox or any synced
+  folder); the desktop reloads the file when the phone changes it.
 - **Light/dark theme**.
 - **Auto-updates** on macOS, Windows, and Linux via `electron-updater`.
 

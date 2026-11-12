@@ -765,6 +765,41 @@ function registerTrayIpcHandlers() {
   );
 }
 
+/**
+ * The data file's contents as this app last read or wrote them. Another
+ * device syncing the same file (the Android app, via Drive or Dropbox) shows
+ * up as contents that differ, and the window reloads them instead of
+ * overwriting them with its next save.
+ */
+let knownDataFileContents: string | null = null;
+let watchedDataFilePath: string | null = null;
+
+/** How often to look at the data file. Polling copes with sync clients that replace files. */
+const DATA_FILE_POLL_MS = 2000;
+
+function watchDataFile(filePath: string | undefined) {
+  if (watchedDataFilePath === (filePath ?? null)) return;
+  if (watchedDataFilePath) fs.unwatchFile(watchedDataFilePath);
+  watchedDataFilePath = filePath ?? null;
+  if (!filePath) return;
+
+  fs.watchFile(filePath, { interval: DATA_FILE_POLL_MS }, (current, previous) => {
+    if (current.mtimeMs === previous.mtimeMs && current.size === previous.size) return;
+    let contents: string;
+    try {
+      contents = fs.readFileSync(filePath, "utf8");
+    } catch {
+      return;
+    }
+    // Sync clients can leave the file empty for a moment while replacing it.
+    if (!contents.trim() || contents === knownDataFileContents) return;
+    knownDataFileContents = contents;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("file:changed", contents);
+    }
+  });
+}
+
 function registerFileIpcHandlers() {
   ipcMain.handle("file:get-remembered-path", () => {
     const config = readAppConfig();
@@ -775,6 +810,8 @@ function registerFileIpcHandlers() {
     const config = readAppConfig();
     config.dataFilePath = filePath;
     writeAppConfig(config);
+    knownDataFileContents = null;
+    watchDataFile(filePath);
   });
 
   ipcMain.handle("file:open-dialog", async () => {
@@ -801,7 +838,10 @@ function registerFileIpcHandlers() {
     const config = readAppConfig();
     if (!config.dataFilePath) return null;
     try {
-      return fs.readFileSync(config.dataFilePath, "utf8");
+      const contents = fs.readFileSync(config.dataFilePath, "utf8");
+      knownDataFileContents = contents;
+      watchDataFile(config.dataFilePath);
+      return contents;
     } catch {
       return null;
     }
@@ -812,6 +852,8 @@ function registerFileIpcHandlers() {
     if (!config.dataFilePath) return false;
     try {
       fs.writeFileSync(config.dataFilePath, data, "utf8");
+      knownDataFileContents = data;
+      watchDataFile(config.dataFilePath);
       return true;
     } catch {
       return false;

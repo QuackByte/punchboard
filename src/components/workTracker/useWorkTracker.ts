@@ -478,7 +478,7 @@ export function useWorkTracker() {
   };
 
   const initializeFromFile = useCallback(
-    (payload: DataFile, path: string) => {
+    (payload: DataFile, path: string, keepView = false) => {
       populateLocalStorageFromFile(payload);
 
       if (payload.settings) {
@@ -489,7 +489,7 @@ export function useWorkTracker() {
         setLeaveYearStartMonth(clampMonth(payload.settings.leaveYearStartMonth));
         setWorkRules(normalizeWorkRules(payload.settings));
       }
-      if (payload.uiState) {
+      if (payload.uiState && !keepView) {
         setMonthKey(payload.uiState.monthKey);
         setGraphYear(payload.uiState.graphYear);
       }
@@ -574,6 +574,24 @@ export function useWorkTracker() {
   useEffect(() => {
     void tryLoadRememberedFile();
   }, [tryLoadRememberedFile]);
+
+  // Another device saved the shared file (the Android app syncs it through
+  // Drive or Dropbox): load its data, keeping the month in view, rather than
+  // overwriting it with this window's next save.
+  useEffect(() => {
+    if (!isFileMode || !fileInitialized) return;
+    return window.fileAPI!.onFileChanged?.((raw) => {
+      let payload: DataFile;
+      try {
+        payload = parseDataFile(raw);
+      } catch {
+        return;
+      }
+      setIsMonthHydrated(false);
+      initializeFromFile(payload, filePath, true);
+      setFileLoadVersion((version) => version + 1);
+    });
+  }, [fileInitialized, filePath, initializeFromFile]);
 
   const chooseExistingFile = useCallback(async () => {
     const path = await window.fileAPI!.openDialog();
