@@ -6,6 +6,8 @@ export interface FileAPI {
   saveDialog(): Promise<string | null>;
   readFile(): Promise<string | null>;
   writeFile(data: string): Promise<boolean>;
+  /** The data file changed on disk, e.g. synced from the Android app. */
+  onFileChanged?(listener: (contents: string) => void): () => void;
 }
 
 export type UpdateCheckResult =

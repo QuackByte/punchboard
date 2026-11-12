@@ -72,6 +72,11 @@ contextBridge.exposeInMainWorld("fileAPI", {
   readFile: (): Promise<string | null> => ipcRenderer.invoke("file:read"),
   writeFile: (data: string): Promise<boolean> =>
     ipcRenderer.invoke("file:write", data),
+  onFileChanged: (listener: (contents: string) => void) => {
+    const handler = (_event: unknown, contents: string) => listener(contents);
+    ipcRenderer.on("file:changed", handler);
+    return () => ipcRenderer.removeListener("file:changed", handler);
+  },
 });
 
 contextBridge.exposeInMainWorld("updateAPI", {
