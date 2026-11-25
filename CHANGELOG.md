@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.16.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.15.0...punchboard-v1.16.0) (2026-11-25)
+
+
+### Features
+
+* carry the extra deduction forward to later months ([#76](https://github.com/QuackByte/punchboard/issues/76)) ([72174ca](https://github.com/QuackByte/punchboard/commit/72174caca9234c11b17fd0a7528149a2938853bd))
+* change the punch-in time from the punch clock ([#77](https://github.com/QuackByte/punchboard/issues/77)) ([d43831a](https://github.com/QuackByte/punchboard/commit/d43831a287fff77076a1a78c96d777e0dbfc1e71))
+
 ## [1.15.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.14.4...punchboard-v1.15.0) (2026-11-12)
 
 
