@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.16.0...punchboard-v1.16.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **deps:** update packages with security advisories ([#79](https://github.com/QuackByte/punchboard/issues/79)) ([9f519a4](https://github.com/QuackByte/punchboard/commit/9f519a4bbb0af230fd81df062c1aa0a97aa8ae3b))
+
 ## [1.16.0](https://github.com/QuackByte/punchboard/compare/punchboard-v1.15.0...punchboard-v1.16.0) (2026-11-25)
 
 
