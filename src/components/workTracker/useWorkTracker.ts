@@ -69,6 +69,7 @@ import {
   weeklyHoursOf,
   workedTime,
 } from "./calculations";
+import { CarriedPayField, carryForwardPay, DEFAULT_PAY } from "./carryForward";
 import { useUndo } from "./useUndo";
 
 /** Sets or removes a key so restoring "nothing" really removes it. */
@@ -187,13 +188,10 @@ export function useWorkTracker() {
     };
   }, []);
 
-  const DEFAULT_HOURLY_RATE = 15;
-  const DEFAULT_TAX_PERCENT = 0;
-  const DEFAULT_DEFAULT_HOURS = 8;
-  const DEFAULT_CURRENCY: CurrencyCode = "GBP";
-  const DEFAULT_SECONDARY_CURRENCY: CurrencyCode = "EUR";
-  const DEFAULT_CONVERSION_RATE = 1;
-  const DEFAULT_CURRENCY_CONVERSION_ENABLED = false;
+  const DEFAULT_CURRENCY = DEFAULT_PAY.currency;
+  const DEFAULT_SECONDARY_CURRENCY = DEFAULT_PAY.secondaryCurrency;
+  const DEFAULT_CONVERSION_RATE = DEFAULT_PAY.conversionRate;
+  const DEFAULT_CURRENCY_CONVERSION_ENABLED = DEFAULT_PAY.currencyConversionEnabled;
 
   const [monthKey, setMonthKey] = useState<string>(initialUiState.monthKey);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([
@@ -400,62 +398,21 @@ export function useWorkTracker() {
 
       try {
         const data = JSON.parse(raw) as Partial<TrackerData>;
-        if (
-          typeof data.hourlyRate === "number" &&
-          typeof data.taxPercent === "number"
-        ) {
-          return {
-            hourlyRate: Math.max(0, data.hourlyRate),
-            taxPercent: clampPercent(data.taxPercent),
-            defaultHours:
-              typeof data.defaultHours === "number"
-                ? Math.max(0, data.defaultHours)
-                : DEFAULT_DEFAULT_HOURS,
-            currency: data.currency ?? DEFAULT_CURRENCY,
-            secondaryCurrency:
-              data.secondaryCurrency ?? DEFAULT_SECONDARY_CURRENCY,
-            conversionRate:
-              typeof data.conversionRate === "number"
-                ? Math.max(0, data.conversionRate)
-                : DEFAULT_CONVERSION_RATE,
-            currencyConversionEnabled:
-              data.currencyConversionEnabled ??
-              DEFAULT_CURRENCY_CONVERSION_ENABLED,
-            salary: normalizeSalary(data.salary),
-          };
-        }
+        const carried = carryForwardPay(data);
+        if (carried) return carried;
       } catch {
         // ignore corrupted month data and continue
       }
     }
 
-    return {
-      hourlyRate: DEFAULT_HOURLY_RATE,
-      taxPercent: DEFAULT_TAX_PERCENT,
-      defaultHours: DEFAULT_DEFAULT_HOURS,
-      currency: DEFAULT_CURRENCY,
-      secondaryCurrency: DEFAULT_SECONDARY_CURRENCY,
-      conversionRate: DEFAULT_CONVERSION_RATE,
-      currencyConversionEnabled: DEFAULT_CURRENCY_CONVERSION_ENABLED,
-      salary: DEFAULT_SALARY,
-    };
+    return DEFAULT_PAY;
   };
 
   /**
-   * Rate/tax/currency settings carry forward: changing them in one month
+   * Rate/tax/deduction/currency settings carry forward: changing them in one month
    * also rewrites every already-saved later month.
    */
-  const updateCurrentAndFutureMonths = <
-    K extends
-      | "hourlyRate"
-      | "taxPercent"
-      | "defaultHours"
-      | "conversionRate"
-      | "currency"
-      | "secondaryCurrency"
-      | "currencyConversionEnabled"
-      | "salary",
-  >(
+  const updateCurrentAndFutureMonths = <K extends CarriedPayField>(
     field: K,
     value: TrackerData[K],
   ) => {
@@ -735,6 +692,7 @@ export function useWorkTracker() {
   const onExtraDeductionChange = (value: number) => {
     const next = Math.max(0, value || 0);
     setExtraDeduction(next);
+    updateCurrentAndFutureMonths("extraDeduction", next);
     addActivity("value-change", `Updated extra deduction to ${next}`);
   };
 
@@ -832,7 +790,7 @@ export function useWorkTracker() {
       setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
       setSalary(carryForward.salary);
       setTaxPercent(carryForward.taxPercent);
-      setExtraDeduction(0);
+      setExtraDeduction(carryForward.extraDeduction);
       setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
@@ -884,7 +842,7 @@ export function useWorkTracker() {
       setCurrencyConversionEnabled(carryForward.currencyConversionEnabled);
       setSalary(carryForward.salary);
       setTaxPercent(carryForward.taxPercent);
-      setExtraDeduction(0);
+      setExtraDeduction(carryForward.extraDeduction);
       setDefaultHours(carryForward.defaultHours);
       setExceptions({});
       setDailyHours({});
