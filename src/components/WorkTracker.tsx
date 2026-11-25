@@ -402,6 +402,7 @@ export default function WorkTracker() {
                   isViewingCurrentPeriod={isViewingCurrentPeriod}
                   onPunchIn={punchIn}
                   onPunchOut={punchOut}
+                  onSetPunchIn={tracker.setPunchIn}
                   onGoToCurrentPeriod={goToCurrentPeriod}
                   onEditDay={setEditingKey}
                 />

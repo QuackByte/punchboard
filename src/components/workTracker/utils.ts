@@ -308,6 +308,25 @@ export function entryMinutes(entry: TimeEntry, nowMinutes?: number) {
   return end >= start ? end - start : end + 1440 - start;
 }
 
+/**
+ * Why today's running session can't start at `minutes`, or null when it can.
+ * A start after now would read as a session that ran past midnight.
+ */
+export function punchInError(
+  entries: TimeEntry[],
+  minutes: number,
+  nowMinutes: number,
+): string | null {
+  if (minutes > nowMinutes) {
+    return "That's later than now";
+  }
+  const overlap = entries.find((entry) => {
+    const end = entry.end === null ? null : parseClock(entry.end);
+    return end !== null && end > minutes;
+  });
+  return overlap ? `Overlaps ${overlap.start}–${overlap.end}` : null;
+}
+
 /** Total hours across a day's sessions (running sessions as in entryMinutes). */
 export function sumEntriesHours(entries: TimeEntry[], nowMinutes?: number) {
   return (

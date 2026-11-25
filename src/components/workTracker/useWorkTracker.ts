@@ -33,6 +33,7 @@ import {
   getPayslipRange,
   keyToDate,
   minutesSinceMidnight,
+  punchInError,
   parseDayInput,
   parseMonthKey,
   safeStorageGetItem,
@@ -1598,6 +1599,29 @@ export function useWorkTracker() {
     setDayEntries(todayKey, next);
   };
 
+  /** Moves the start of today's running session, with undo. */
+  const setPunchIn = (minutes: number) => {
+    if (!openSession || openSession.key !== todayKey) {
+      return;
+    }
+    const entries = timeEntries[todayKey] ?? [];
+    const start = formatClock(minutes);
+    if (
+      start === openSession.entry.start ||
+      punchInError(entries, minutes, minutesSinceMidnight(new Date()))
+    ) {
+      return;
+    }
+    const { restore } = snapshotDay(todayKey);
+    setDayEntries(
+      todayKey,
+      entries.map((entry, index) =>
+        index === openSession.index ? { ...entry, start } : entry,
+      ),
+    );
+    offerUndo(`Punch-in moved to ${start}`, restore);
+  };
+
   const handleTrayPunchToggle = useCallback(() => {
     if (!fileInitialized) {
       window.desktop?.showMainWindow();
@@ -2191,6 +2215,7 @@ export function useWorkTracker() {
     openSession,
     punchIn,
     punchOut,
+    setPunchIn,
     recentActivity,
     yearlyData,
     calendarCells,

@@ -9,6 +9,7 @@ import {
   parseClock,
   parseDayInput,
   parseHoursInput,
+  punchInError,
   sumEntriesHours,
 } from "../utils";
 
@@ -82,6 +83,30 @@ describe("sumEntriesHours", () => {
     expect(sumEntriesHours([{ start: "22:00", end: "02:00" }])).toBe(4);
     expect(sumEntriesHours([{ start: "09:00", end: null }])).toBe(0);
     expect(sumEntriesHours([{ start: "09:00", end: null }], 600)).toBe(1);
+  });
+});
+
+describe("punchInError", () => {
+  // Running since 13:15, after 08:57–12:31; it's 15:42.
+  const entries = [
+    { start: "08:57", end: "12:31" },
+    { start: "13:15", end: null },
+  ];
+  const now = 15 * 60 + 42;
+
+  it("accepts times from the last session's end up to now", () => {
+    expect(punchInError(entries, 12 * 60 + 31, now)).toBeNull();
+    expect(punchInError(entries, 13 * 60 + 5, now)).toBeNull();
+    expect(punchInError(entries, now, now)).toBeNull();
+  });
+
+  it("refuses a time later than now", () => {
+    expect(punchInError(entries, now + 1, now)).toBe("That's later than now");
+  });
+
+  it("refuses a time overlapping an earlier session", () => {
+    expect(punchInError(entries, 12 * 60 + 30, now)).toBe("Overlaps 08:57–12:31");
+    expect(punchInError(entries, 7 * 60, now)).toBe("Overlaps 08:57–12:31");
   });
 });
 

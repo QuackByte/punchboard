@@ -1,4 +1,6 @@
-import { ArrowRight, CalendarClock, LogIn, LogOut } from "lucide-react";
+import { ArrowRight, CalendarClock, LogIn, LogOut, Pencil } from "lucide-react";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { estimateFinish, workedTime } from "./calculations";
 import { TimeEntry, WorkRules } from "./types";
@@ -9,6 +11,8 @@ import {
   formatDuration,
   keyToDate,
   minutesSinceMidnight,
+  parseClock,
+  punchInError,
   sumEntriesHours,
 } from "./utils";
 
@@ -25,6 +29,8 @@ interface PunchClockProps {
   isViewingCurrentPeriod: boolean;
   onPunchIn: () => void;
   onPunchOut: () => void;
+  /** Moves the running session's start; without it the start is read-only. */
+  onSetPunchIn?: (minutes: number) => void;
   onGoToCurrentPeriod: () => void;
   onEditDay: (key: string) => void;
   /** Top-left label; the tray popover swaps in the app name. */
@@ -46,6 +52,7 @@ export default function PunchClock({
   isViewingCurrentPeriod,
   onPunchIn,
   onPunchOut,
+  onSetPunchIn,
   onGoToCurrentPeriod,
   onEditDay,
   label = "01 · Punch clock",
@@ -138,7 +145,16 @@ export default function PunchClock({
             <span className="h-2 w-2 animate-punch-pulse rounded-full bg-signal" />
             <span>
               On the clock since{" "}
-              <span className="font-mono">{openSession.entry.start}</span>
+              {onSetPunchIn ? (
+                <PunchInEditor
+                  start={openSession.entry.start}
+                  entries={todayEntries}
+                  nowMinutes={nowMinutes}
+                  onSave={onSetPunchIn}
+                />
+              ) : (
+                <span className="font-mono">{openSession.entry.start}</span>
+              )}
               <span className="text-ink-muted">
                 {" "}
                 · {formatDuration(runningMinutes / 60)}
@@ -268,6 +284,83 @@ export default function PunchClock({
 
       {footer ? <div className="relative mt-3">{footer}</div> : null}
     </section>
+  );
+}
+
+/** The running session's start, opening a small popover to correct it. */
+function PunchInEditor({
+  start,
+  entries,
+  nowMinutes,
+  onSave,
+}: {
+  start: string;
+  entries: TimeEntry[];
+  nowMinutes: number;
+  onSave: (minutes: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(start);
+  const minutes = parseClock(draft);
+  const error = minutes === null ? null : punchInError(entries, minutes, nowMinutes);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setDraft(start);
+        setOpen(next);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Change punch-in time, ${start}`}
+          className="group inline-flex items-center gap-1 rounded-md px-1 font-mono transition-colors hover:bg-ink-foreground/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          {start}
+          <Pencil className="h-3 w-3 text-ink-muted transition-colors group-hover:text-ink-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (minutes === null || error) return;
+            onSave(minutes);
+            setOpen(false);
+          }}
+        >
+          <label htmlFor="punch-in-time" className="stamp">
+            Punched in at
+          </label>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              id="punch-in-time"
+              type="time"
+              value={draft}
+              aria-invalid={!!error}
+              aria-describedby="punch-in-error"
+              onChange={(event) => setDraft(event.target.value)}
+              className={cn(
+                "h-9 min-w-0 flex-1 rounded-lg border bg-background/60 px-2 font-mono text-sm tabular outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20",
+                error && "border-destructive focus:border-destructive",
+              )}
+            />
+            <button
+              type="submit"
+              disabled={minutes === null || !!error}
+              className="h-9 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-25"
+            >
+              Set
+            </button>
+          </div>
+          <p id="punch-in-error" role="status" className="mt-1 min-h-4 text-[11px] text-destructive">
+            {error}
+          </p>
+        </form>
+      </PopoverContent>
+    </Popover>
   );
 }
 
