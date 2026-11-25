@@ -20,7 +20,8 @@ marketing page, or jump straight into the
 ## Features
 
 - **Punch clock** — punch in and out for today with one click; the running
-  session is tracked live and saved as a real start/end time.
+  session is tracked live and saved as a real start/end time. Punched in
+  late? Click the punch-in time to correct it.
 - **Clocked sessions** — click any day on the time card to log sessions,
   either with quick entry (`9-13, 14-18:30`, `8:45 to 17`, or a plain total
   like `7.5` / `7h 30m`) or by editing start/end times directly. Each day
