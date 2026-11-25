@@ -41,6 +41,8 @@ marketing page, or jump straight into the
   top or tracked as unpaid, and the payslip shows your effective hourly rate.
   Tax and extra deductions give estimated gross and net pay for the current
   payslip period (with a configurable payslip start day).
+  Changing a pay rate, tax or the extra deduction applies to that payslip
+  period and every later one.
 - **Currency conversion** — optionally show a second currency alongside your
   primary one on every payslip line, using a manual conversion rate.
 - **Balanced weeks** — today's target is what's left of your weekly hours,
