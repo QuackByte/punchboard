@@ -1008,10 +1008,17 @@ function setupAutoUpdates() {
     void promptToInstallUpdate(autoUpdater);
   });
 
-  void autoUpdater.checkForUpdatesAndNotify();
+  // Failures are already logged by the "error" listener above, which
+  // electron-updater emits before rejecting; catch here so the rejection
+  // isn't reported a second time as unhandled.
+  const checkInBackground = () => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  };
+
+  checkInBackground();
   const timer = setInterval(() => {
     if (downloadedUpdateVersion) return;
-    void autoUpdater.checkForUpdatesAndNotify();
+    checkInBackground();
   }, UPDATE_CHECK_INTERVAL_MS);
   timer.unref();
 }
