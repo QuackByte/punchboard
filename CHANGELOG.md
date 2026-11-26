@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.2](https://github.com/QuackByte/punchboard/compare/punchboard-v1.16.1...punchboard-v1.16.2) (2026-11-26)
+
+
+### Bug Fixes
+
+* **deps:** patch minimatch, upgrade Electron 45.5 / TypeScript 7, refresh deps ([#81](https://github.com/QuackByte/punchboard/issues/81)) ([17a5e6a](https://github.com/QuackByte/punchboard/commit/17a5e6acded3f04ea7cf3fd459ecb72d3288dc8c))
+
 ## [1.16.1](https://github.com/QuackByte/punchboard/compare/punchboard-v1.16.0...punchboard-v1.16.1) (2026-11-25)
 
 
