@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": false,
+    "rootDir": "electron",
     "outDir": "dist-electron",
     "types": ["node"],
     "isolatedModules": false

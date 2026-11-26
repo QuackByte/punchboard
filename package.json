@@ -98,11 +98,11 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "concurrently": "^10.0.7",
-    "electron": "^45.2.3",
+    "electron": "^45.5.0",
     "electron-builder": "^26.18.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.3.5",
-    "typescript": "^5.0.0",
+    "typescript": "^7.0.2",
     "vite": "^8.1.2",
     "vitest": "^5.0.3",
     "wait-on": "^9.5.1"
